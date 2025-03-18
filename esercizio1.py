@@ -27,7 +27,35 @@ for row in sheet.iter_rows(values_only=True):
     if first_not_none != -1:
         data.append(row[first_not_none:last_not_none+1])
 
+data = np.array(data)
+print("\nPATTERN")
+print(data)
 
+corr = np.corrcoef(data, rowvar=False)
+print("\nMATRICE DI CORRELAZIONE")
+print(corr)
 
-for d in data:
-    print(d)
+e_val, e_vec = np.linalg.eig(corr)
+
+sort_index = e_val.argsort()[::-1]
+e_val = e_val[sort_index]
+e_vec = e_vec[sort_index, :]
+
+#
+print(sort_index)
+
+e_val_sum = np.sum(e_val)
+
+print("\nAUTOVETT MATRICE DI CORRELAZIONE")
+print(e_vec)
+
+print("\nAUTOVAL MATRICE DI CORRELAZIONE")
+print(e_val)
+
+val_sum = 0
+print("\nPERCENTUALI")
+for i, val in enumerate(e_val):
+    val_sum += val
+    print(round(val, 1), "\t", round(val/e_val_sum * 100, 1), "%\t", round(val_sum/e_val_sum * 100, 1), "%")
+
+#print(e_val)
