@@ -3,7 +3,8 @@ import sklearn.ensemble as ens
 import matplotlib.pyplot as plt
 import time as clock
 
-from matplotlib import cm
+
+from matplotlib import cm, colors
 from matplotlib.widgets import Slider
 from scipy.io import loadmat
 from sklearn.model_selection import KFold
@@ -17,7 +18,8 @@ data = loadmat(path_file)
 g0 = data['g__0']
 g1 = data['g__1']
 tot_pattern = np.concatenate((g0[:17], g1[:17]), axis=0)
-ext_test_pattern = np.concatenate((g0[18:], g1[18:]), axis=0)
+int_test_pattern = np.concatenate((g0[18:], g1[18:]), axis=0)
+
 
 Nneg = len(g0[:, 0])
 Npos = len(g1[:, 0])
@@ -27,7 +29,7 @@ label1 = 'POSITIVI'
 g0_labels = np.full(Nneg, label0)
 g1_labels = np.full(Npos, label1)
 tot_labels = np.concatenate((g0_labels[:17], g1_labels[:17]), axis=0)
-ext_test_labels = np.concatenate((g0_labels[18:], g1_labels[18:]), axis=0)
+int_test_labels = np.concatenate((g0_labels[18:], g1_labels[18:]), axis=0)
 
 # tree_range =  np.concatenate((range(5, 50, 5), range(50, 100, 20), range(100, 500, 30)), axis = 0)
 tree_range = range(10, 410, 10)
@@ -206,23 +208,33 @@ fig3d = plt.figure()
 
 X, Y = np.meshgrid(k_range, tree_range)
 
-ax_acc = fig3d.add_subplot(131, projection='3d')
-ax_acc.plot_surface(X, Y, accuracy_list, cmap=cm.plasma)
+scores = np.concatenate((accuracy_list, sensitivity_list, specificity_list), axis = 0)
+normalization = colors.Normalize(vmin=np.min(scores), vmax=np.max(scores))
+
+# ax_acc = fig3d.add_subplot(131, projection='3d')
+# ax_acc.plot_surface(X, Y, accuracy_list, cmap=cm.plasma)
+ax_acc = fig3d.add_subplot(131)
+ax_acc.pcolormesh(k_range, tree_range, accuracy_list, norm=normalization, cmap=cm.plasma)
 ax_acc.set_ylabel("Number of trees")
 ax_acc.set_xlabel("Number of folds")
 ax_acc.set_title("Accuracy")
 
-ax_sens = fig3d.add_subplot(132, projection='3d')
-ax_sens.plot_surface(X, Y, sensitivity_list, cmap=cm.plasma)
+# ax_sens = fig3d.add_subplot(132, projection='3d')
+# ax_sens.plot_surface(X, Y, sensitivity_list, cmap=cm.plasma)
+ax_sens = fig3d.add_subplot(132)
+ax_sens.pcolormesh(k_range, tree_range, sensitivity_list, norm=normalization,cmap=cm.plasma)
 ax_sens.set_ylabel("Number of trees")
 ax_sens.set_xlabel("Number of folds")
 ax_sens.set_title("Sensitivity")
 
-ax_spec = fig3d.add_subplot(133, projection='3d')
-ax_spec.plot_surface(X, Y, specificity_list, cmap=cm.plasma)
+# ax_spec = fig3d.add_subplot(133, projection='3d')
+# ax_spec.plot_surface(X, Y, specificity_list, cmap=cm.plasma)
+ax_spec = fig3d.add_subplot(133)
+colormesh = ax_spec.pcolormesh(k_range, tree_range, specificity_list, norm=normalization, cmap=cm.plasma)
 ax_spec.set_ylabel("Number of trees")
 ax_spec.set_xlabel("Number of folds")
 ax_spec.set_title("Specificity")
 
+fig3d.colorbar(colormesh,  orientation='vertical')
 print("Tempo:" + str(round((clock.time() - start)/60)) + "'" + str(round((clock.time() - start)%60)) + "''")
 plt.show()
