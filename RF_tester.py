@@ -2,6 +2,7 @@ import numpy as np
 import sklearn.ensemble as ens
 import matplotlib.pyplot as plt
 import time as clock
+import pandas as pd
 
 from sklearn.model_selection import KFold
 from scipy.io import loadmat
