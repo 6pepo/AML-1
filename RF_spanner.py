@@ -3,6 +3,7 @@ import sklearn.ensemble as ens
 import matplotlib.pyplot as plt
 import time as clock
 
+
 from matplotlib import cm, colors
 from matplotlib.widgets import Slider
 from scipy.io import loadmat
@@ -10,7 +11,7 @@ from sklearn.model_selection import KFold
 
 start = clock.time()
 
-path_file = "01.SVM - RF - Matlab [signal]/data/signal__b.mat"
+path_file = "signal__b.mat"
 
 data = loadmat(path_file)
 
@@ -18,6 +19,7 @@ g0 = data['g__0']
 g1 = data['g__1']
 tot_pattern = np.concatenate((g0[:17], g1[:17]), axis=0)
 int_test_pattern = np.concatenate((g0[18:], g1[18:]), axis=0)
+
 
 Nneg = len(g0[:, 0])
 Npos = len(g1[:, 0])
@@ -61,7 +63,7 @@ for i_trees, n_trees in enumerate(tree_range):
         fold_sensitivity = []
         fold_specificity = []
 
-        kf = KFold(n_splits = k, shuffle = True, random_state = 69)
+        kf = KFold(n_splits = k, shuffle = True, random_state = 8)
         indices = kf.split(tot_labels)
 
 
@@ -143,7 +145,7 @@ for i_trees, n_trees in enumerate(tree_range):
         specificity_list[i_trees, i_k] = specificity
         specificity_std_list[i_trees, i_k] = specificity_std
 
-print("\nFinished Scanning!\n")
+print("Finished Scanning!                                                \n")
 
 # Saves performance parameters in csv files, to be read and graphed in another program
 #for i_t, i_k in (range(len(tree_range), range(k_range)):
@@ -234,6 +236,5 @@ ax_spec.set_xlabel("Number of folds")
 ax_spec.set_title("Specificity")
 
 fig3d.colorbar(colormesh,  orientation='vertical')
-
 print("Tempo:" + str(round((clock.time() - start)/60)) + "'" + str(round((clock.time() - start)%60)) + "''")
 plt.show()
