@@ -24,19 +24,19 @@ e_val, e_vec = eig(corr) #in teoria più efficiente con scipy
 # e_vec = np.transpose(e_vec)
 
 print('Sorting eigenvalues and eigenvectors...\n')
-sort_index = np.argsort(e_val)[::-1]
+sort_index = np.argsort(e_val)[::-1]        # First 27 eigenvalues and eigenvectors are confirmed to be fully real
 e_val = e_val[sort_index].real
 e_vec = e_vec[:, sort_index].real
 
-for i in range(len(e_val[:20])):
+for i in range(len(e_val[:5])):
     print('Eigenvalue: {}'.format(e_val[i]))
-    print('Eigenvector: {}\n'.format(e_vec[:10, i]))
+    print('Eigenvector: {}\n'.format(e_vec[:5, i]))
 
 e_val_sum = np.sum(e_val)
 
 val_sum = 0
 n_vec = 0
-perc_tresh = 0.9
+perc_tresh = 0.9            # Threshold of features at wich we cut
 print('\nOriginal\tPercent\tCumulative')
 for i,val in enumerate(e_val):
     val_sum += val
@@ -48,8 +48,8 @@ for i,val in enumerate(e_val):
 print("Searching primary contributors of eigenvalues")
 labels = []
 pc = []
-for i in range(len(e_val[:n_vec])):
-    prim_coeff = np.argsort(e_vec[:, i])[::-1]
+for i in range(n_vec):
+    prim_coeff = np.argsort(abs(e_vec[:, i]))[::-1]
     pc.append(prim_coeff)
     labels.append('v'+str(i+1))
 
