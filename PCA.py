@@ -2,6 +2,7 @@ import numpy as np
 import pandas as pd
 import openpyxl
 import matplotlib.pyplot as plt
+
 from scipy.linalg import eig
 
 file = '5ML-Riduzione-PCA-EsercizioGuidato-EsercizioAutonomia-Dati.xlsx'

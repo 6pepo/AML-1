@@ -2,19 +2,22 @@ import numpy as np
 import sklearn.ensemble as ens
 import matplotlib.pyplot as plt
 import time as clock
+import pandas as pd
 
 from sklearn.model_selection import KFold
 from scipy.io import loadmat
 
 start = clock.time()
 
-# Training and internal testing set
+pc_mat = pd.read_csv("eigenvectors.csv", sep = ',', index_col=0)
+pc_mat = pc_mat.to_numpy()
+
 path_file = "signal__b.mat"
 
 data = loadmat(path_file)
 
-g0 = data['g__0']
-g1 = data['g__1']
+g0 = data['g__0'].dot(pc_mat)
+g1 = data['g__1'].dot(pc_mat)
 tot_pattern = np.concatenate((g0[:17], g1[:17]), axis=0)
 int_test_pattern = np.concatenate((g0[18:], g1[18:]), axis=0)
 
@@ -31,13 +34,12 @@ g1_labels = np.full(Npos, label1)
 tot_labels = np.concatenate((g0_labels[:17], g1_labels[:17]), axis=0)
 int_test_labels = np.concatenate((g0_labels[18:], g1_labels[18:]), axis=0)
 
-# External testing set
 path_file = 'signal__a.mat'
 
 data = loadmat(path_file)
 
-g0_ext = data['g__0']
-g1_ext = data['g__1']
+g0_ext = data['g__0'].dot(pc_mat)
+g1_ext = data['g__1'].dot(pc_mat)
 tot_ext_patt = np.concatenate((g0_ext, g1_ext), axis=0)
 
 Nneg_ext = len(g0_ext)
@@ -47,10 +49,14 @@ g0_ext_labels = np.full(Nneg_ext, label0)
 g1_ext_labels = np.full(Npos_ext, label1)
 ext_labels = np.concatenate((g0_ext_labels, g1_ext_labels), axis=0)
 
+# print(len(tot_labels))
+# print(tot_labels)
+# print(len(int_test_labels))
+# print(int_test_labels)
 
 # Iperparameters
 k = 5
-n_trees = 100
+n_trees = 200
 
 # Metrics
 fold_accuracy = []
@@ -158,7 +164,7 @@ print("Sensitivity: {:.2%} +- {:.2%} Rel: {:.2%}".format(sensitivity, sensitivit
 print("Specificity: {:.2%} +- {:.2%} Rel: {:.2%}".format(specificity, specificity_std, spec_rel))
 print("\n")
 
-# Performance of Internal Test
+# Performance of internal Test
 
 int_accuracy = 0.
 int_sensitivity = 0.
@@ -175,19 +181,19 @@ for i, true_label in enumerate(int_test_labels):
         int_accuracy += 1./(Npos_int+Nneg_int)
         int_sensitivity += 1./Npos_int
 
-print("Performance of internal test")
+print("Performance of Internal test")
 print("Accuracy: {:.2%}".format(int_accuracy))
 print("Sensitivity: {:.2%}".format(int_sensitivity))
 print("Specificity: {:.2%}".format(int_specificity))
 print("\n")
 
-# Performance of External Test
+# Performance of external Test
 
 ext_accuracy = 0.
 ext_sensitivity = 0.
 ext_specificity = 0.
 
-print(ext_labels) # Che siano in realtà invertiti?
+# Che siano in realtà invertiti?
 print(vote_neg_ext)
 print(vote_pos_ext)
 
@@ -199,7 +205,7 @@ for i, true_label in enumerate(ext_labels):
         ext_accuracy += 1./(Npos_ext+Nneg_ext)
         ext_sensitivity += 1./Npos_ext
 
-print("Performance of external test")
+print("Performance of External test")
 print("Accuracy: {:.2%}".format(ext_accuracy))
 print("Sensitivity: {:.2%}".format(ext_sensitivity))
 print("Specificity: {:.2%}".format(ext_specificity))
