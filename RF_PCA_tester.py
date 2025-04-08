@@ -51,7 +51,7 @@ ext_labels = np.concatenate((g0_ext_labels, g1_ext_labels), axis=0)
 
 # Iperparameters
 k = 5
-n_trees = 200
+n_trees = 100
 
 # Metrics
 fold_accuracy = []
