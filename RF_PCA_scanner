@@ -23,22 +23,15 @@ data = loadmat(path_file)
 
 g0 = data['g__0'].dot(pc_mat)
 g1 = data['g__1'].dot(pc_mat)
-#tot_pattern = np.concatenate((g0[:17], g1[:17]), axis=0)   # con internal test
-#int_test_pattern = np.concatenate((g0[18:], g1[18:]), axis=0)
 tot_pattern = np.concatenate((g0, g1), axis=0)  # senza internal test
 
 Nneg = len(g0[:, 0])
 Npos = len(g1[:, 0])
 
-#Nneg_int = int(len(int_test_pattern[:, 0]) / 2)
-#Npos_int = int(len(int_test_pattern[:, 0]) / 2)
-
 label0 = 'NEGATIVI'
 label1 = 'POSITIVI'
 g0_labels = np.full(Nneg, label0)
 g1_labels = np.full(Npos, label1)
-#tot_labels = np.concatenate((g0_labels[:17], g1_labels[:17]), axis=0)  # con internal test
-#int_test_labels = np.concatenate((g0_labels[18:], g1_labels[18:]), axis=0)
 tot_labels = np.concatenate((g0_labels, g1_labels), axis=0)     # senza internal test
 
 path_file = 'signal__a.mat'
@@ -56,13 +49,8 @@ g0_ext_labels = np.full(Nneg_ext, label0)
 g1_ext_labels = np.full(Npos_ext, label1)
 ext_labels = np.concatenate((g0_ext_labels, g1_ext_labels), axis=0)
 
-# print(len(tot_labels))
-# print(tot_labels)
-# print(len(int_test_labels))
-# print(int_test_labels)
-
-# tree_range =  np.concatenate((range(5, 50, 5), range(50, 100, 20), range(100, 500, 30)), axis = 0)
 tree_range = range(290, 410, 5)
+#tree_range = range(10, 410, 50)
 tree_range = np.asarray(tree_range)
 
 k_range = range(3, 8, 1)
@@ -77,223 +65,178 @@ sensitivity_std_list = np.empty((len_tree, len_k))
 specificity_list = np.empty((len_tree, len_k))
 specificity_std_list = np.empty((len_tree, len_k))
 
-#int_accuracy_list = np.empty((len_tree, len_k))
-#int_sensitivity_list = np.empty((len_tree, len_k))
-#int_specificity_list = np.empty((len_tree, len_k))
-
 ext_accuracy_list = np.empty((len_tree, len_k))
 ext_sensitivity_list = np.empty((len_tree, len_k))
 ext_specificity_list = np.empty((len_tree, len_k))
+
+accuracy_list_r = np.zeros((len_tree, len_k))
+accuracy_std_list_r = np.zeros((len_tree, len_k))
+sensitivity_list_r = np.zeros((len_tree, len_k))
+sensitivity_std_list_r = np.zeros((len_tree, len_k))
+specificity_list_r = np.zeros((len_tree, len_k))
+specificity_std_list_r = np.zeros((len_tree, len_k))
+
+ext_accuracy_list_r = np.zeros((len_tree, len_k))
+ext_sensitivity_list_r = np.zeros((len_tree, len_k))
+ext_specificity_list_r = np.zeros((len_tree, len_k))
 
 # Metrics
 fold_accuracy = []
 fold_sensitivity = []
 fold_specificity = []
 
-print("Begin Scanning...")
-tot_iter = len_tree * len_k
-iter = 0
-
-'''
-# Iperparameters
-k = 5
-n_trees = 200
-
-kf = KFold(n_splits=k, shuffle=True, random_state=8)
-indices = kf.split(tot_labels)
-'''
-
-#vote_pos = np.zeros(len(int_test_labels))
-#vote_neg = np.zeros(len(int_test_labels))
-
 vote_pos_ext = np.zeros(len(ext_labels))
 vote_neg_ext = np.zeros(len(ext_labels))
 
+rand_state = np.linspace(0, 1000000, num=10, dtype=int)
+len_rand = len(rand_state)
+
+tot_iter = len_tree * len_k * len_rand
 progress = tqdm(total=tot_iter)
+iter = 0
 
-for i_trees, n_trees in enumerate(tree_range):
-    for i_k, k in enumerate(k_range):
-        iter += 1
-        #print("N_trees: ", n_trees, "\tN_fold: ", k, "\tIteration: ", iter, "/", tot_iter, end='\r')  # Python 3.x
-        #print("N_trees: {}\tN_fold: {}\tIteration: {}/{} \r".format(n_trees, k, iter, tot_iter)),       #Python 2.x
+print("Begin Scanning...")
+for i_rand, rand in enumerate(rand_state):
+    for i_trees, n_trees in enumerate(tree_range):
+        for i_k, k in enumerate(k_range):
+            iter += 1
 
-        progress.set_description(f"N_trees: {n_trees} | N_fold: {k}")
-        progress.update(1)
+            # Progress bar
+            progress.set_description(f"Trees: {i_trees+1}/{len_tree} | Fold: {i_k+1}/{len_k} | Rand_state: {i_rand+1}/{len_rand}")
+            progress.update(1)
 
-        # Metrics
-        fold_accuracy = []
-        fold_sensitivity = []
-        fold_specificity = []
+            # Metrics
+            fold_accuracy = []
+            fold_sensitivity = []
+            fold_specificity = []
 
-        kf = KFold(n_splits=k, shuffle=True, random_state=8)
-        indices = kf.split(tot_labels)
+            kf = KFold(n_splits=k, shuffle=True, random_state=rand)
+            indices = kf.split(tot_labels)
 
-        for i, (train_index, test_index) in enumerate(indices):
+            for i, (train_index, test_index) in enumerate(indices):
 
-            # print("Fold: {}".format(i+1))
+                # print("Fold: {}".format(i+1))
 
-            train_pattern = tot_pattern[train_index]
-            train_labels = tot_labels[train_index]
+                train_pattern = tot_pattern[train_index]
+                train_labels = tot_labels[train_index]
 
-            test_pattern = tot_pattern[test_index]
-            test_labels = tot_labels[test_index]
+                test_pattern = tot_pattern[test_index]
+                test_labels = tot_labels[test_index]
 
-            model = ens.RandomForestClassifier(n_estimators=n_trees,
-                                               criterion='gini',
-                                               max_depth=None,
-                                               min_samples_split=2,
-                                               min_samples_leaf=1,
-                                               min_weight_fraction_leaf=0.0,
-                                               max_features='sqrt',
-                                               max_leaf_nodes=None,
-                                               min_impurity_decrease=0.0,
-                                               bootstrap=True)
+                model = ens.RandomForestClassifier(n_estimators=n_trees,
+                                                   criterion='gini',
+                                                   max_depth=None,
+                                                   min_samples_split=2,
+                                                   min_samples_leaf=1,
+                                                   min_weight_fraction_leaf=0.0,
+                                                   max_features='sqrt',
+                                                   max_leaf_nodes=None,
+                                                   min_impurity_decrease=0.0,
+                                                   bootstrap=True)
 
-            model.fit(train_pattern, train_labels)
+                model.fit(train_pattern, train_labels)
 
-            test_prediction = model.predict(test_pattern)
+                test_prediction = model.predict(test_pattern)
 
-            temp_Npos = 0
-            temp_Nneg = 0
+                temp_Npos = 0
+                temp_Nneg = 0
 
-            for t_lab in test_labels:
-                if t_lab == label1:
-                    temp_Npos += 1
-                if t_lab == label0:
-                    temp_Nneg += 1
+                for t_lab in test_labels:
+                    if t_lab == label1:
+                        temp_Npos += 1
+                    if t_lab == label0:
+                        temp_Nneg += 1
 
-            temp_accuracy = 0.
-            temp_sensitivity = 0.
-            temp_specificity = 0.
+                temp_accuracy = 0.
+                temp_sensitivity = 0.
+                temp_specificity = 0.
 
-            for j, pred in enumerate(test_prediction):
-                if pred == label1 and test_labels[j] == label1:
-                    temp_accuracy += 1. / (temp_Npos + temp_Nneg)
-                    temp_sensitivity += 1. / temp_Npos
+                for j, pred in enumerate(test_prediction):
+                    if pred == label1 and test_labels[j] == label1:
+                        temp_accuracy += 1. / (temp_Npos + temp_Nneg)
+                        temp_sensitivity += 1. / temp_Npos
 
-                if pred == label0 and test_labels[j] == label0:
-                    temp_accuracy += 1. / (temp_Npos + temp_Nneg)
-                    temp_specificity += 1. / temp_Nneg
+                    if pred == label0 and test_labels[j] == label0:
+                        temp_accuracy += 1. / (temp_Npos + temp_Nneg)
+                        temp_specificity += 1. / temp_Nneg
 
-            fold_accuracy.append(temp_accuracy)
-            fold_sensitivity.append(temp_sensitivity)
-            fold_specificity.append(temp_specificity)
+                fold_accuracy.append(temp_accuracy)
+                fold_sensitivity.append(temp_sensitivity)
+                fold_specificity.append(temp_specificity)
 
-            '''
-            # Internal tests: Majority vote
-            int_prediction = model.predict(int_test_pattern)
+                # External test: Majority vote
+                ext_prediction = model.predict(tot_ext_patt)
 
-            for j, pred in enumerate(int_prediction):
-                if pred == label0:
-                    vote_neg[j] += 1
-                if pred == label1:
-                    vote_pos[j] += 1
-            '''
+                for j, pred in enumerate(ext_prediction):
+                    if pred == label0:
+                        vote_neg_ext[j] += 1
+                    if pred == label1:
+                        vote_pos_ext[j] += 1
 
-            # External test: Majority vote
-            ext_prediction = model.predict(tot_ext_patt)
+            accuracy = np.mean(fold_accuracy)
+            accuracy_std = np.std(fold_accuracy)
+            sensitivity = np.mean(fold_sensitivity)
+            sensitivity_std = np.std(fold_sensitivity)
+            specificity = np.mean(fold_specificity)
+            specificity_std = np.std(fold_specificity)
 
-            for j, pred in enumerate(ext_prediction):
-                if pred == label0:
-                    vote_neg_ext[j] += 1
-                if pred == label1:
-                    vote_pos_ext[j] += 1
-        '''
-        print("Fold\tAcc\tSensit\tSpecif")
-        for i, acc in enumerate(fold_accuracy):
-            print("{}\t{:.2%}\t{:.2%}\t{:.2%}".format(i + 1, acc, fold_sensitivity[i], fold_specificity[i]))
-        
-        print("\n")
-        '''
-        accuracy = np.mean(fold_accuracy)
-        accuracy_std = np.std(fold_accuracy)
-        sensitivity = np.mean(fold_sensitivity)
-        sensitivity_std = np.std(fold_sensitivity)
-        specificity = np.mean(fold_specificity)
-        specificity_std = np.std(fold_specificity)
+            accuracy_list[i_trees, i_k] = accuracy
+            accuracy_std_list[i_trees, i_k] = accuracy_std
+            sensitivity_list[i_trees, i_k] = sensitivity
+            sensitivity_std_list[i_trees, i_k] = sensitivity_std
+            specificity_list[i_trees, i_k] = specificity
+            specificity_std_list[i_trees, i_k] = specificity_std
 
-        accuracy_list[i_trees, i_k] = accuracy
-        accuracy_std_list[i_trees, i_k] = accuracy_std
-        sensitivity_list[i_trees, i_k] = sensitivity
-        sensitivity_std_list[i_trees, i_k] = sensitivity_std
-        specificity_list[i_trees, i_k] = specificity
-        specificity_std_list[i_trees, i_k] = specificity_std
+            acc_rel = accuracy_std / accuracy
+            sens_rel = sensitivity_std / sensitivity
+            spec_rel = specificity_std / specificity
 
-        acc_rel = accuracy_std / accuracy
-        sens_rel = sensitivity_std / sensitivity
-        spec_rel = specificity_std / specificity
+            # Performance of external Test
 
-        '''
-        print("Performance of cross validation")
-        print("Accuracy: {:.2%} +- {:.2%} Rel: {:.2%}".format(accuracy, accuracy_std, acc_rel))
-        print("Sensitivity: {:.2%} +- {:.2%} Rel: {:.2%}".format(sensitivity, sensitivity_std, sens_rel))
-        print("Specificity: {:.2%} +- {:.2%} Rel: {:.2%}".format(specificity, specificity_std, spec_rel))
-        print("\n")
-        '''
+            ext_accuracy = 0.
+            ext_sensitivity = 0.
+            ext_specificity = 0.
 
-        '''
-        # Performance of internal Test
+            # Che siano in realtà invertiti?
+            #print(vote_neg_ext)
+            #print(vote_pos_ext)
 
-        int_accuracy = 0.
-        int_sensitivity = 0.
-        int_specificity = 0.
+            for i, true_label in enumerate(ext_labels):
+                if vote_neg_ext[i] >= vote_pos_ext[i] and true_label == label0:
+                    ext_accuracy += 1. / (Npos_ext + Nneg_ext)
+                    ext_specificity += 1. / Nneg_ext
+                if vote_neg_ext[i] < vote_pos_ext[i] and true_label == label1:
+                    ext_accuracy += 1. / (Npos_ext + Nneg_ext)
+                    ext_sensitivity += 1. / Npos_ext
 
-        #print(vote_neg)
-        #print(vote_pos)
+            ext_accuracy_list[i_trees, i_k] = ext_accuracy
+            ext_sensitivity_list[i_trees, i_k] = ext_sensitivity
+            ext_specificity_list[i_trees, i_k] = ext_specificity
 
-        for i, true_label in enumerate(int_test_labels):
-            if vote_neg[i] >= vote_pos[i] and true_label == label0:
-                int_accuracy += 1. / (Npos_int + Nneg_int)
-                int_specificity += 1. / Nneg_int
-            if vote_neg[i] < vote_pos[i] and true_label == label1:
-                int_accuracy += 1. / (Npos_int + Nneg_int)
-                int_sensitivity += 1. / Npos_int
-        
-        print("Performance of Internal test")
-        print("Accuracy: {:.2%}".format(int_accuracy))
-        print("Sensitivity: {:.2%}".format(int_sensitivity))
-        print("Specificity: {:.2%}".format(int_specificity))
-        print("\n")
-        
-        int_accuracy_list[i_trees, i_k] = int_accuracy
-        int_sensitivity_list[i_trees, i_k] = int_sensitivity
-        int_specificity_list[i_trees, i_k] = int_specificity
-        '''
+    accuracy_list_r += accuracy_list
+    accuracy_std_list_r += accuracy_std_list
+    sensitivity_list_r += sensitivity_list
+    sensitivity_std_list_r += sensitivity_std_list
+    specificity_list_r += specificity_list
+    specificity_std_list_r += specificity_std_list
 
-        # Performance of external Test
-
-        ext_accuracy = 0.
-        ext_sensitivity = 0.
-        ext_specificity = 0.
-
-        # Che siano in realtà invertiti?
-        #print(vote_neg_ext)
-        #print(vote_pos_ext)
-
-        for i, true_label in enumerate(ext_labels):
-            if vote_neg_ext[i] >= vote_pos_ext[i] and true_label == label0:
-                ext_accuracy += 1. / (Npos_ext + Nneg_ext)
-                ext_specificity += 1. / Nneg_ext
-            if vote_neg_ext[i] < vote_pos_ext[i] and true_label == label1:
-                ext_accuracy += 1. / (Npos_ext + Nneg_ext)
-                ext_sensitivity += 1. / Npos_ext
-
-        '''
-        print("Performance of External test")
-        print("Accuracy: {:.2%}".format(ext_accuracy))
-        print("Sensitivity: {:.2%}".format(ext_sensitivity))
-        print("Specificity: {:.2%}".format(ext_specificity))
-        print("\n")
-        '''
-
-        ext_accuracy_list[i_trees, i_k] = ext_accuracy
-        ext_sensitivity_list[i_trees, i_k] = ext_sensitivity
-        ext_specificity_list[i_trees, i_k] = ext_specificity
-
+    ext_accuracy_list_r += ext_accuracy_list
+    ext_sensitivity_list_r += ext_sensitivity_list
+    ext_specificity_list_r += ext_specificity_list
 
 progress.close()
 print("Finished Scanning!                                                \n")
 
+accuracy_list_r = accuracy_list_r / len_rand
+accuracy_std_list_r = accuracy_std_list_r / len_rand
+sensitivity_list_r = sensitivity_list_r / len_rand
+sensitivity_std_list_r = sensitivity_std_list_r / len_rand
+specificity_list_r = specificity_list_r / len_rand
+specificity_std_list_r = specificity_std_list_r / len_rand
+
+ext_accuracy_list_r = ext_accuracy_list_r / len_rand
+ext_sensitivity_list_r = ext_sensitivity_list_r / len_rand
+ext_specificity_list_r = ext_specificity_list_r / len_rand
 
 # Plot con lo slider
 def slider_graph(tree, plotted_metric, plotted_error, plot_title):
@@ -302,8 +245,6 @@ def slider_graph(tree, plotted_metric, plotted_error, plot_title):
 
     ax_colors = ['blue', 'green', 'red']
     ax_titles = ['Accuracy', 'Sensitivity', 'Specificity']
-
-    #plotted_metric =[accuracy, sensitivity, specificity]
 
     for i in range(0, 3):
 
@@ -349,8 +290,6 @@ def colormap_plot(k_range, tree_range, plotted_metric, plot_title, norm):
 
     accuracy_list, sensitivity_list, specificity_list = plotted_metric
 
-    #vmin = np.min(np.array([np.min(accuracy_list), np.min(sensitivity_list), np.min(specificity_list)]))
-    #vmax = np.max(np.array([np.max(accuracy_list), np.max(sensitivity_list), np.max(specificity_list)]))
     vmin, vmax = norm
 
     ax_titles = ['Accuracy', 'Sensitivity', 'Specificity']
@@ -374,26 +313,14 @@ def colormap_plot(k_range, tree_range, plotted_metric, plot_title, norm):
 
 
 # Grafici cross validation
-cross_metric = [accuracy_list, sensitivity_list, specificity_list]
-cross_error = [accuracy_std_list, sensitivity_std_list, specificity_std_list]
+cross_metric = [accuracy_list_r, sensitivity_list_r, specificity_list_r]
+cross_error = [accuracy_std_list_r, sensitivity_std_list_r, specificity_std_list_r]
 cross_title = 'Cross validation'
 
 fig_cross, ax_cross = slider_graph(tree_range, cross_metric, cross_error, cross_title)
 kSlide_cross = define_slider(fig_cross, k_range)
 
 fig3d_cross = colormap_plot(k_range, tree_range, cross_metric, cross_title, cmap_norm(cross_metric))
-
-'''
-# Grafici internal test
-int_metric = [int_accuracy_list, int_sensitivity_list, int_specificity_list]
-int_error = None
-int_title = 'Internal test'
-
-fig_int, ax_int = slider_graph(tree_range, int_metric, int_error, int_title)
-kSlide_int = define_slider(fig_int, k_range)
-
-fig3d_int = colormap_plot(k_range, tree_range, int_metric, int_title)
-'''
 
 # Grafici external test
 ext_metric = [ext_accuracy_list, ext_sensitivity_list, ext_specificity_list]
@@ -405,79 +332,19 @@ kSlide_ext = define_slider(fig_ext, k_range)
 
 fig3d_ext = colormap_plot(k_range, tree_range, ext_metric, ext_title, cmap_norm(ext_metric))
 
-'''
-def update_cross(val):
-    ax_colors = ['blue', 'green', 'red']
-    ax_titles = ['Accuracy', 'Sensitivity', 'Specificity']
-
-    i = k_range.index(kSlide_cross.val)
-    ax = ax_cross
-    for j in range(0, 3):
-        ax[j].clear()
-        ax[j].scatter(tree_range, cross_metric[j][:, i], color=ax_colors[j])
-        ax[j].errorbar(tree_range, cross_metric[j][:, i], yerr=cross_error[:, i], color=ax_colors[j])
-        ax[j].grid(True)
-        ax[j].set_ylim(0, 1.2)
-        ax[j].set_title(ax_titles[j])
-    fig_cross.canvas.draw_idle()
-
-
-def update_int(val):
-    ax_colors = ['blue', 'green', 'red']
-    ax_titles = ['Accuracy', 'Sensitivity', 'Specificity']
-
-    i = k_range.index(kSlide_int.val)
-    ax = ax_int
-    for j in range(0, 3):
-        ax[j].clear()
-        ax[j].scatter(tree_range, int_metric[j][:, i], color=ax_colors[j])
-        #ax[j].errorbar(tree_range, int_metric[:, i], yerr=0, color=ax_colors[j])
-        ax[j].grid(True)
-        ax[j].set_ylim(0, 1.2)
-        ax[j].set_title(ax_titles[j])
-    fig_int.canvas.draw_idle()
-
-
-def update_ext(val):
-    ax_colors = ['blue', 'green', 'red']
-    ax_titles = ['Accuracy', 'Sensitivity', 'Specificity']
-
-    i = k_range.index(kSlide_int.val)
-    ax = ax_ext
-    for j in range(0, 3):
-        ax[j].clear()
-        ax[j].scatter(tree_range, ext_metric[j][:, i], color=ax_colors[j])
-        #ax[j].errorbar(tree_range, ext_metric[:, i], yerr=0, color=ax_colors[j])
-        ax[j].grid(True)
-        ax[j].set_ylim(0, 1.2)
-        ax[j].set_title(ax_titles[j])
-    fig_ext.canvas.draw_idle()
-
-
-kSlide_cross.on_changed(update_cross)
-kSlide_int.on_changed(update_int)
-kSlide_ext.on_changed(update_ext)
-'''
-
 
 def update(val):
     ax_colors = ['blue', 'green', 'red']
     ax_titles = ['Accuracy', 'Sensitivity', 'Specificity']
 
     l = k_range.index(kSlide_cross.val)
-    #m = k_range.index(kSlide_int.val)
     n = k_range.index(kSlide_ext.val)
-    #graph_selector = [l, m, n]
     graph_selector = [l, n]
 
-    #ax = [ax_cross, ax_int, ax_ext]
     ax = [ax_cross, ax_ext]
-    #metric = [cross_metric, int_metric, ext_metric]
     metric = [cross_metric, ext_metric]
-    #yerr = [cross_error, np.zeros_like(int_metric), np.zeros_like(ext_metric)]
     yerr = [cross_error, np.zeros_like(ext_metric)]
 
-    #for i in range(0, 3):  # ciclo su cross, int, ext
     for i in range(0, 2):  # ciclo su cross, ext
         for j in range(0, 3):   # ciclo su acc, sens, spec
             ax[i][j].clear()
@@ -490,7 +357,6 @@ def update(val):
 
 
 kSlide_cross.on_changed(update)
-#kSlide_int.on_changed(update)
 kSlide_ext.on_changed(update)
 
 print("Tempo:" + str(round((clock.time() - start) / 60)) + "'" + str(round((clock.time() - start) % 60)) + "''")
