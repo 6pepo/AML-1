@@ -15,21 +15,16 @@ data = loadmat(path_file)
 
 g0 = data['g__0']
 g1 = data['g__1']
-tot_pattern = np.concatenate((g0[:17], g1[:17]), axis=0)
-int_test_pattern = np.concatenate((g0[18:], g1[18:]), axis=0)
+tot_pattern = np.concatenate((g0, g1), axis=0)
 
 Nneg = len(g0[:, 0])
 Npos = len(g1[:, 0])
-
-Nneg_int = int(len(int_test_pattern[:, 0])/2)
-Npos_int = int(len(int_test_pattern[:, 0])/2)
 
 label0 = 'NEGATIVI'
 label1 = 'POSITIVI'
 g0_labels = np.full(Nneg, label0)
 g1_labels = np.full(Npos, label1)
-tot_labels = np.concatenate((g0_labels[:17], g1_labels[:17]), axis=0)
-int_test_labels = np.concatenate((g0_labels[18:], g1_labels[18:]), axis=0)
+tot_labels = np.concatenate((g0_labels, g1_labels), axis=0)
 
 # External testing set
 path_file = 'signal__a.mat'
@@ -52,6 +47,8 @@ ext_labels = np.concatenate((g0_ext_labels, g1_ext_labels), axis=0)
 k = 5
 n_trees = 100
 
+models = []
+
 # Metrics
 fold_accuracy = []
 fold_sensitivity = []
@@ -59,9 +56,6 @@ fold_specificity = []
 
 kf = KFold(n_splits = k, shuffle = True, random_state = 8)
 indices = kf.split(tot_labels)
-
-vote_pos = np.zeros(len(int_test_labels))
-vote_neg = np.zeros(len(int_test_labels))
 
 vote_pos_ext = np.zeros(len(ext_labels))
 vote_neg_ext = np.zeros(len(ext_labels))
@@ -88,6 +82,7 @@ for i, (train_index, test_index) in enumerate(indices):
                                                bootstrap=True)
 
     model.fit(train_pattern, train_labels)
+    models.append(model)
 
     test_prediction = model.predict(test_pattern)
 
@@ -116,15 +111,6 @@ for i, (train_index, test_index) in enumerate(indices):
     fold_accuracy.append(temp_accuracy)
     fold_sensitivity.append(temp_sensitivity)
     fold_specificity.append(temp_specificity)
-
-    # Internal tests: Majority vote
-    int_prediction = model.predict(int_test_pattern)
-
-    for j, pred in enumerate(int_prediction):
-        if pred == label0:
-            vote_neg[j] += 1
-        if pred == label1:
-            vote_pos[j] += 1
 
     # External test: Majority vote
     ext_prediction = model.predict(tot_ext_patt)
@@ -158,36 +144,13 @@ print("Sensitivity: {:.2%} +- {:.2%} Rel: {:.2%}".format(sensitivity, sensitivit
 print("Specificity: {:.2%} +- {:.2%} Rel: {:.2%}".format(specificity, specificity_std, spec_rel))
 print("\n")
 
-# Performance of Internal Test
-
-int_accuracy = 0.
-int_sensitivity = 0.
-int_specificity = 0.
-
-print(vote_neg)
-print(vote_pos)
-
-for i, true_label in enumerate(int_test_labels):
-    if vote_neg[i]>=vote_pos[i] and true_label == label0:
-        int_accuracy += 1./(Npos_int+Nneg_int)
-        int_specificity += 1./Nneg_int
-    if vote_neg[i]<vote_pos[i] and true_label == label1:
-        int_accuracy += 1./(Npos_int+Nneg_int)
-        int_sensitivity += 1./Npos_int
-
-print("Performance of internal test")
-print("Accuracy: {:.2%}".format(int_accuracy))
-print("Sensitivity: {:.2%}".format(int_sensitivity))
-print("Specificity: {:.2%}".format(int_specificity))
-print("\n")
-
 # Performance of External Test
 
 ext_accuracy = 0.
 ext_sensitivity = 0.
 ext_specificity = 0.
 
-print(ext_labels) # Che siano in realtà invertiti?
+# print(ext_labels) # Che siano in realtà invertiti?
 print(vote_neg_ext)
 print(vote_pos_ext)
 
@@ -204,5 +167,20 @@ print("Accuracy: {:.2%}".format(ext_accuracy))
 print("Sensitivity: {:.2%}".format(ext_sensitivity))
 print("Specificity: {:.2%}".format(ext_specificity))
 print("\n")
+
+
+# Counting root feature in decision Trees
+feat_counter = np.zeros(len(g0[0]))
+
+for model in models:
+    for estim in model.estimators_:
+        feat_counter[estim.tree_.feature[0]] += 1
+
+prim_feat_trees = np.argsort(feat_counter)[::-1]
+print("Most frequent argument in tree roots:")
+print("F_num\tCount")
+for i in range(10):
+    print("{}\t{}".format(prim_feat_trees[i], feat_counter[prim_feat_trees[i]]))
+print(np.sum(feat_counter))
 
 print("Tempo:" + str(round((clock.time() - start)/60)) + "'" + str(round((clock.time() - start)%60)) + "''")

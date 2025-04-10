@@ -3,7 +3,6 @@ import sklearn.ensemble as ens
 import matplotlib.pyplot as plt
 import time as clock
 
-
 from matplotlib import cm, colors
 from matplotlib.widgets import Slider
 from scipy.io import loadmat
@@ -17,8 +16,7 @@ data = loadmat(path_file)
 
 g0 = data['g__0']
 g1 = data['g__1']
-tot_pattern = np.concatenate((g0[:17], g1[:17]), axis=0)
-int_test_pattern = np.concatenate((g0[18:], g1[18:]), axis=0)
+tot_pattern = np.concatenate((g0, g1), axis=0)
 
 
 Nneg = len(g0[:, 0])
@@ -28,8 +26,7 @@ label0 = 'NEGATIVI'
 label1 = 'POSITIVI'
 g0_labels = np.full(Nneg, label0)
 g1_labels = np.full(Npos, label1)
-tot_labels = np.concatenate((g0_labels[:17], g1_labels[:17]), axis=0)
-int_test_labels = np.concatenate((g0_labels[18:], g1_labels[18:]), axis=0)
+tot_labels = np.concatenate((g0_labels, g1_labels), axis=0)
 
 # tree_range =  np.concatenate((range(5, 50, 5), range(50, 100, 20), range(100, 500, 30)), axis = 0)
 tree_range = range(10, 410, 10)
@@ -55,15 +52,15 @@ iter = 0
 for i_trees, n_trees in enumerate(tree_range):
     for i_k, k in enumerate(k_range):
         iter += 1
-        print("N_trees: ", n_trees, "\tN_fold: ", k, "\tIteration: ", iter, "/", tot_iter,end='\r')     #Python 3.x
-        # print("N_trees: {}\tN_fold: {}\tIteration: {}/{} \r".format(n_trees, k, iter, tot_iter)),       #Python 2.x
+        # print("N_trees: ", n_trees, "\tN_fold: ", k, "\tIteration: ", iter, "/", tot_iter,end='\r')     #Python 3.x
+        print("N_trees: {}\tN_fold: {}\tIteration: {}/{} \r".format(n_trees, k, iter, tot_iter)),       #Python 2.x
 
         # Metrics
         fold_accuracy = []
         fold_sensitivity = []
         fold_specificity = []
 
-        kf = KFold(n_splits = k, shuffle = True, random_state = 8)
+        kf = KFold(n_splits = k, shuffle = True, random_state = np.random.rand()*1000)
         indices = kf.split(tot_labels)
 
 
