@@ -1,0 +1,363 @@
+import numpy as np
+import sklearn.ensemble as ens
+import matplotlib.pyplot as plt
+import time as clock
+import pandas as pd
+
+from matplotlib import cm
+from matplotlib.widgets import Slider
+from matplotlib.ticker import MaxNLocator
+from scipy.io import loadmat
+from sklearn.model_selection import KFold
+
+from tqdm import tqdm
+
+start = clock.time()
+
+pc_mat = pd.read_csv("eigenvectors.csv", sep=',', index_col=0)
+pc_mat = pc_mat.to_numpy()
+
+path_file = "signal__b.mat"
+
+data = loadmat(path_file)
+
+g0 = data['g__0'].dot(pc_mat)
+g1 = data['g__1'].dot(pc_mat)
+tot_pattern = np.concatenate((g0, g1), axis=0)  # senza internal test
+
+Nneg = len(g0[:, 0])
+Npos = len(g1[:, 0])
+
+label0 = 'NEGATIVI'
+label1 = 'POSITIVI'
+g0_labels = np.full(Nneg, label0)
+g1_labels = np.full(Npos, label1)
+tot_labels = np.concatenate((g0_labels, g1_labels), axis=0)     # senza internal test
+
+path_file = 'signal__a.mat'
+
+data = loadmat(path_file)
+
+g0_ext = data['g__0'].dot(pc_mat)
+g1_ext = data['g__1'].dot(pc_mat)
+tot_ext_patt = np.concatenate((g0_ext, g1_ext), axis=0)
+
+Nneg_ext = len(g0_ext)
+Npos_ext = len(g1_ext)
+
+g0_ext_labels = np.full(Nneg_ext, label0)
+g1_ext_labels = np.full(Npos_ext, label1)
+ext_labels = np.concatenate((g0_ext_labels, g1_ext_labels), axis=0)
+
+tree_range = range(290, 410, 5)
+#tree_range = range(10, 410, 50)
+tree_range = np.asarray(tree_range)
+
+k_range = range(3, 8, 1)
+
+len_tree = len(tree_range)
+len_k = len(k_range)
+
+accuracy_list = np.empty((len_tree, len_k))
+accuracy_std_list = np.empty((len_tree, len_k))
+sensitivity_list = np.empty((len_tree, len_k))
+sensitivity_std_list = np.empty((len_tree, len_k))
+specificity_list = np.empty((len_tree, len_k))
+specificity_std_list = np.empty((len_tree, len_k))
+
+ext_accuracy_list = np.empty((len_tree, len_k))
+ext_sensitivity_list = np.empty((len_tree, len_k))
+ext_specificity_list = np.empty((len_tree, len_k))
+
+accuracy_list_r = np.zeros((len_tree, len_k))
+accuracy_std_list_r = np.zeros((len_tree, len_k))
+sensitivity_list_r = np.zeros((len_tree, len_k))
+sensitivity_std_list_r = np.zeros((len_tree, len_k))
+specificity_list_r = np.zeros((len_tree, len_k))
+specificity_std_list_r = np.zeros((len_tree, len_k))
+
+ext_accuracy_list_r = np.zeros((len_tree, len_k))
+ext_sensitivity_list_r = np.zeros((len_tree, len_k))
+ext_specificity_list_r = np.zeros((len_tree, len_k))
+
+# Metrics
+fold_accuracy = []
+fold_sensitivity = []
+fold_specificity = []
+
+vote_pos_ext = np.zeros(len(ext_labels))
+vote_neg_ext = np.zeros(len(ext_labels))
+
+rand_state = np.linspace(0, 1000000, num=10, dtype=int)
+len_rand = len(rand_state)
+
+tot_iter = len_tree * len_k * len_rand
+progress = tqdm(total=tot_iter)
+iter = 0
+
+print("Begin Scanning...")
+for i_rand, rand in enumerate(rand_state):
+    for i_trees, n_trees in enumerate(tree_range):
+        for i_k, k in enumerate(k_range):
+            iter += 1
+
+            # Progress bar
+            progress.set_description(f"Trees: {i_trees+1}/{len_tree} | Fold: {i_k+1}/{len_k} | Rand_state: {i_rand+1}/{len_rand}")
+            progress.update(1)
+
+            # Metrics
+            fold_accuracy = []
+            fold_sensitivity = []
+            fold_specificity = []
+
+            kf = KFold(n_splits=k, shuffle=True, random_state=rand)
+            indices = kf.split(tot_labels)
+
+            for i, (train_index, test_index) in enumerate(indices):
+
+                # print("Fold: {}".format(i+1))
+
+                train_pattern = tot_pattern[train_index]
+                train_labels = tot_labels[train_index]
+
+                test_pattern = tot_pattern[test_index]
+                test_labels = tot_labels[test_index]
+
+                model = ens.RandomForestClassifier(n_estimators=n_trees,
+                                                   criterion='gini',
+                                                   max_depth=None,
+                                                   min_samples_split=2,
+                                                   min_samples_leaf=1,
+                                                   min_weight_fraction_leaf=0.0,
+                                                   max_features='sqrt',
+                                                   max_leaf_nodes=None,
+                                                   min_impurity_decrease=0.0,
+                                                   bootstrap=True)
+
+                model.fit(train_pattern, train_labels)
+
+                test_prediction = model.predict(test_pattern)
+
+                temp_Npos = 0
+                temp_Nneg = 0
+
+                for t_lab in test_labels:
+                    if t_lab == label1:
+                        temp_Npos += 1
+                    if t_lab == label0:
+                        temp_Nneg += 1
+
+                temp_accuracy = 0.
+                temp_sensitivity = 0.
+                temp_specificity = 0.
+
+                for j, pred in enumerate(test_prediction):
+                    if pred == label1 and test_labels[j] == label1:
+                        temp_accuracy += 1. / (temp_Npos + temp_Nneg)
+                        temp_sensitivity += 1. / temp_Npos
+
+                    if pred == label0 and test_labels[j] == label0:
+                        temp_accuracy += 1. / (temp_Npos + temp_Nneg)
+                        temp_specificity += 1. / temp_Nneg
+
+                fold_accuracy.append(temp_accuracy)
+                fold_sensitivity.append(temp_sensitivity)
+                fold_specificity.append(temp_specificity)
+
+                # External test: Majority vote
+                ext_prediction = model.predict(tot_ext_patt)
+
+                for j, pred in enumerate(ext_prediction):
+                    if pred == label0:
+                        vote_neg_ext[j] += 1
+                    if pred == label1:
+                        vote_pos_ext[j] += 1
+
+            accuracy = np.mean(fold_accuracy)
+            accuracy_std = np.std(fold_accuracy)
+            sensitivity = np.mean(fold_sensitivity)
+            sensitivity_std = np.std(fold_sensitivity)
+            specificity = np.mean(fold_specificity)
+            specificity_std = np.std(fold_specificity)
+
+            accuracy_list[i_trees, i_k] = accuracy
+            accuracy_std_list[i_trees, i_k] = accuracy_std
+            sensitivity_list[i_trees, i_k] = sensitivity
+            sensitivity_std_list[i_trees, i_k] = sensitivity_std
+            specificity_list[i_trees, i_k] = specificity
+            specificity_std_list[i_trees, i_k] = specificity_std
+
+            acc_rel = accuracy_std / accuracy
+            sens_rel = sensitivity_std / sensitivity
+            spec_rel = specificity_std / specificity
+
+            # Performance of external Test
+
+            ext_accuracy = 0.
+            ext_sensitivity = 0.
+            ext_specificity = 0.
+
+            # Che siano in realtà invertiti?
+            #print(vote_neg_ext)
+            #print(vote_pos_ext)
+
+            for i, true_label in enumerate(ext_labels):
+                if vote_neg_ext[i] >= vote_pos_ext[i] and true_label == label0:
+                    ext_accuracy += 1. / (Npos_ext + Nneg_ext)
+                    ext_specificity += 1. / Nneg_ext
+                if vote_neg_ext[i] < vote_pos_ext[i] and true_label == label1:
+                    ext_accuracy += 1. / (Npos_ext + Nneg_ext)
+                    ext_sensitivity += 1. / Npos_ext
+
+            ext_accuracy_list[i_trees, i_k] = ext_accuracy
+            ext_sensitivity_list[i_trees, i_k] = ext_sensitivity
+            ext_specificity_list[i_trees, i_k] = ext_specificity
+
+    accuracy_list_r += accuracy_list
+    accuracy_std_list_r += accuracy_std_list
+    sensitivity_list_r += sensitivity_list
+    sensitivity_std_list_r += sensitivity_std_list
+    specificity_list_r += specificity_list
+    specificity_std_list_r += specificity_std_list
+
+    ext_accuracy_list_r += ext_accuracy_list
+    ext_sensitivity_list_r += ext_sensitivity_list
+    ext_specificity_list_r += ext_specificity_list
+
+progress.close()
+print("Finished Scanning!                                                \n")
+
+accuracy_list_r = accuracy_list_r / len_rand
+accuracy_std_list_r = accuracy_std_list_r / len_rand
+sensitivity_list_r = sensitivity_list_r / len_rand
+sensitivity_std_list_r = sensitivity_std_list_r / len_rand
+specificity_list_r = specificity_list_r / len_rand
+specificity_std_list_r = specificity_std_list_r / len_rand
+
+ext_accuracy_list_r = ext_accuracy_list_r / len_rand
+ext_sensitivity_list_r = ext_sensitivity_list_r / len_rand
+ext_specificity_list_r = ext_specificity_list_r / len_rand
+
+# Plot con lo slider
+def slider_graph(tree, plotted_metric, plotted_error, plot_title):
+    fig, ax = plt.subplots(3, 1, sharex=True)
+    fig.subplots_adjust(0.2, 0.2)
+
+    ax_colors = ['blue', 'green', 'red']
+    ax_titles = ['Accuracy', 'Sensitivity', 'Specificity']
+
+    for i in range(0, 3):
+
+        if plotted_error is None:
+            yerr = 0
+        else:
+            yerr = plotted_error[i][:, 0]
+
+        ax[i].scatter(tree, plotted_metric[i][:, 0], color=ax_colors[i])
+        ax[i].errorbar(tree, plotted_metric[i][:, 0], yerr=yerr, color=ax_colors[i])
+        ax[i].set_ylim(0, 1.2)
+        ax[i].set_title(ax_titles[i])
+        ax[i].grid(True)
+
+    ax[2].set_xlabel('Number of Trees')
+    fig.suptitle(plot_title)
+
+    return fig, ax
+
+
+def define_slider(fig, k_range):
+    axSlide = fig.add_axes([0.075, 0.2, 0.05, 0.7])
+    kSlide = Slider(ax=axSlide, label="Number of folds", valmin=k_range[0], valmax=k_range[-1], valstep=1,
+                    valinit=k_range[0], orientation='vertical')
+
+    return kSlide
+
+
+def cmap_norm(plotted_metric):
+    accuracy_list, sensitivity_list, specificity_list = plotted_metric
+    vmin = np.min(np.array([np.min(accuracy_list), np.min(sensitivity_list), np.min(specificity_list)]))
+    vmax = np.max(np.array([np.max(accuracy_list), np.max(sensitivity_list), np.max(specificity_list)]))
+
+    return vmin, vmax
+
+
+# Plot con la colormap
+def colormap_plot(k_range, tree_range, plotted_metric, plot_title, norm):
+    fig3d = plt.figure()
+
+    X = k_range
+    Y = tree_range
+
+    accuracy_list, sensitivity_list, specificity_list = plotted_metric
+
+    vmin, vmax = norm
+
+    ax_titles = ['Accuracy', 'Sensitivity', 'Specificity']
+
+    ax = [0, 0, 0]
+    locations = [131, 132, 133]
+    image = [0, 0, 0]
+    for j in range(0, 3):
+        ax[j] = fig3d.add_subplot(locations[j])
+        image[j] = ax[j].pcolormesh(X, Y, accuracy_list, vmin=vmin, vmax=vmax, cmap=cm.plasma)
+        ax[j].set_ylabel("Number of trees")
+        ax[j].set_xlabel("Number of folds")
+        ax[j].set_title(ax_titles[j])
+        ax[j].xaxis.set_major_locator(MaxNLocator(integer=True))
+        ax[j].yaxis.set_major_locator(MaxNLocator(integer=True))
+
+    fig3d.suptitle(plot_title)
+    fig3d.colorbar(image[-1], ax=ax[-1]) #.set_label('$|FFT(E_1)|^2$')
+
+    return fig3d
+
+
+# Grafici cross validation
+cross_metric = [accuracy_list_r, sensitivity_list_r, specificity_list_r]
+cross_error = [accuracy_std_list_r, sensitivity_std_list_r, specificity_std_list_r]
+cross_title = 'Cross validation'
+
+fig_cross, ax_cross = slider_graph(tree_range, cross_metric, cross_error, cross_title)
+kSlide_cross = define_slider(fig_cross, k_range)
+
+fig3d_cross = colormap_plot(k_range, tree_range, cross_metric, cross_title, cmap_norm(cross_metric))
+
+# Grafici external test
+ext_metric = [ext_accuracy_list, ext_sensitivity_list, ext_specificity_list]
+ext_error = None
+ext_title = 'External test'
+
+fig_ext, ax_ext = slider_graph(tree_range, ext_metric, ext_error, ext_title)
+kSlide_ext = define_slider(fig_ext, k_range)
+
+fig3d_ext = colormap_plot(k_range, tree_range, ext_metric, ext_title, cmap_norm(ext_metric))
+
+
+def update(val):
+    ax_colors = ['blue', 'green', 'red']
+    ax_titles = ['Accuracy', 'Sensitivity', 'Specificity']
+
+    l = k_range.index(kSlide_cross.val)
+    n = k_range.index(kSlide_ext.val)
+    graph_selector = [l, n]
+
+    ax = [ax_cross, ax_ext]
+    metric = [cross_metric, ext_metric]
+    yerr = [cross_error, np.zeros_like(ext_metric)]
+
+    for i in range(0, 2):  # ciclo su cross, ext
+        for j in range(0, 3):   # ciclo su acc, sens, spec
+            ax[i][j].clear()
+            ax[i][j].scatter(tree_range, metric[i][j][:, graph_selector[i]], color=ax_colors[j])
+            ax[i][j].errorbar(tree_range, metric[i][j][:, graph_selector[i]], yerr=yerr[i][j][:, graph_selector[i]], color=ax_colors[j])
+            ax[i][j].grid(True)
+            ax[i][j].set_ylim(0, 1.2)
+            ax[i][j].set_title(ax_titles[j])
+    fig_cross.canvas.draw_idle()
+
+
+kSlide_cross.on_changed(update)
+kSlide_ext.on_changed(update)
+
+print("Tempo:" + str(round((clock.time() - start) / 60)) + "'" + str(round((clock.time() - start) % 60)) + "''")
+plt.show()

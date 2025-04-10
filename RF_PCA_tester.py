@@ -2,19 +2,22 @@ import numpy as np
 import sklearn.ensemble as ens
 import matplotlib.pyplot as plt
 import time as clock
+import pandas as pd
 
 from sklearn.model_selection import KFold
 from scipy.io import loadmat
 
 start = clock.time()
 
-# Training and internal testing set
+pc_mat = pd.read_csv("eigenvectors.csv", sep = ',', index_col=0)
+# pc_mat = pc_mat.to_numpy()
+
 path_file = "signal__b.mat"
 
 data = loadmat(path_file)
 
-g0 = data['g__0']
-g1 = data['g__1']
+g0 = data['g__0'].dot(pc_mat)
+g1 = data['g__1'].dot(pc_mat)
 tot_pattern = np.concatenate((g0, g1), axis=0)
 
 Nneg = len(g0[:, 0])
@@ -26,13 +29,12 @@ g0_labels = np.full(Nneg, label0)
 g1_labels = np.full(Npos, label1)
 tot_labels = np.concatenate((g0_labels, g1_labels), axis=0)
 
-# External testing set
 path_file = 'signal__a.mat'
 
 data = loadmat(path_file)
 
-g0_ext = data['g__0']
-g1_ext = data['g__1']
+g0_ext = data['g__0'].dot(pc_mat)
+g1_ext = data['g__1'].dot(pc_mat)
 tot_ext_patt = np.concatenate((g0_ext, g1_ext), axis=0)
 
 Nneg_ext = len(g0_ext)
@@ -42,12 +44,14 @@ g0_ext_labels = np.full(Nneg_ext, label0)
 g1_ext_labels = np.full(Npos_ext, label1)
 ext_labels = np.concatenate((g0_ext_labels, g1_ext_labels), axis=0)
 
+# print(len(tot_labels))
+# print(tot_labels)
+# print(len(int_test_labels))
+# print(int_test_labels)
 
 # Iperparameters
 k = 5
 n_trees = 100
-
-models = []
 
 # Metrics
 fold_accuracy = []
@@ -82,7 +86,6 @@ for i, (train_index, test_index) in enumerate(indices):
                                                bootstrap=True)
 
     model.fit(train_pattern, train_labels)
-    models.append(model)
 
     test_prediction = model.predict(test_pattern)
 
@@ -144,13 +147,12 @@ print("Sensitivity: {:.2%} +- {:.2%} Rel: {:.2%}".format(sensitivity, sensitivit
 print("Specificity: {:.2%} +- {:.2%} Rel: {:.2%}".format(specificity, specificity_std, spec_rel))
 print("\n")
 
-# Performance of External Test
-
+# Performance of external Test (TO BE CORRECTED)
 ext_accuracy = 0.
 ext_sensitivity = 0.
 ext_specificity = 0.
 
-# print(ext_labels) # Che siano in realtà invertiti?
+# Che siano in realtà invertiti?
 print(vote_neg_ext)
 print(vote_pos_ext)
 
@@ -162,25 +164,10 @@ for i, true_label in enumerate(ext_labels):
         ext_accuracy += 1./(Npos_ext+Nneg_ext)
         ext_sensitivity += 1./Npos_ext
 
-print("Performance of external test")
+print("Performance of External test")
 print("Accuracy: {:.2%}".format(ext_accuracy))
 print("Sensitivity: {:.2%}".format(ext_sensitivity))
 print("Specificity: {:.2%}".format(ext_specificity))
 print("\n")
-
-
-# Counting root feature in decision Trees
-feat_counter = np.zeros(len(g0[0]))
-
-for model in models:
-    for estim in model.estimators_:
-        feat_counter[estim.tree_.feature[0]] += 1
-
-prim_feat_trees = np.argsort(feat_counter)[::-1]
-print("Most frequent argument in tree roots:")
-print("F_num\tCount")
-for i in range(10):
-    print("{}\t{}".format(prim_feat_trees[i], feat_counter[prim_feat_trees[i]]))
-print(np.sum(feat_counter))
 
 print("Tempo:" + str(round((clock.time() - start)/60)) + "'" + str(round((clock.time() - start)%60)) + "''")
