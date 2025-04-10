@@ -9,10 +9,21 @@ from scipy.io import loadmat
 
 start = clock.time()
 
+n_iter = 100
+
+# Iperparameters non-PCA
+k = 7
+n_trees = 245
+
+# Iperparameters PCA
+k_PCA = 5
+n_trees_PCA = 150
+
+
     #NON PCA
 
 # Training and internal testing set
-path_file = "01.SVM - RF - Matlab [signal]/data/signal__b.mat"
+path_file = "signal__b.mat"
 
 data = loadmat(path_file)
 
@@ -30,7 +41,7 @@ g1_labels = np.full(Npos, label1)
 tot_labels = np.concatenate((g0_labels, g1_labels), axis=0)
 
 # External testing set
-path_file = "01.SVM - RF - Matlab [signal]/data/signal__a.mat"
+path_file = "signal__a.mat"
 
 data = loadmat(path_file)
 
@@ -41,15 +52,9 @@ tot_ext_patt = np.concatenate((g0_ext, g1_ext), axis=0)
 Nneg_ext = len(g0_ext)
 Npos_ext = len(g1_ext)
 
-g0_ext_labels = np.full(Nneg_ext, label1)
+g0_ext_labels = np.full(Nneg_ext, label1)                           #Labels are inverted!
 g1_ext_labels = np.full(Npos_ext, label0)
 ext_labels = np.concatenate((g0_ext_labels, g1_ext_labels), axis=0)
-
-
-# Iperparameters non-PCA
-k = 7
-n_trees = 240
-n_iter = 100
 
 feat_counter = np.zeros(len(g0[0]))
 
@@ -62,10 +67,10 @@ sens_ext_list = []
 spec_ext_list = []
 
 print('Starting Non-PCA iterations...')
-start_non_pca = clock.process_time()
+#start_non_pca = clock.process_time()                               #CPU time is different in 2.7-
 for n in range(n_iter):
-    # print("Iteration: {}/{} \r".format(n, n_iter)),
-    print(f'Iteration: {n}/{n_iter}', end='\r' )
+    print("Iteration: {}/{} \r".format(n, n_iter)),
+    # print(f'Iteration: {n}/{n_iter}', end='\r' )
 
     models = []
 
@@ -210,7 +215,7 @@ print("Performance of External test")
 print("Accuracy: {:.2%} +- {:.2%} Rel: {:.2%}".format(tot_acc_ext, tot_acc_ext_std, tot_acc_ext_std/tot_acc_ext))
 print("Sensitivity: {:.2%} +- {:.2%} Rel: {:.2%}".format(tot_sens_ext, tot_sens_ext_std, tot_sens_ext_std/tot_sens_ext))
 print("Specificity: {:.2%} +- {:.2%} Rel: {:.2%}".format(tot_spec_ext, tot_spec_ext_std, tot_spec_ext_std/tot_spec_ext))
-print("CPU Time:" + str((clock.process_time() - start_non_pca)))
+#print("CPU Time:" + str((clock.process_time() - start_non_pca)))
 print("\n")
 
 
@@ -226,11 +231,6 @@ g0_ext = g0_ext.dot(pc_mat)
 g1_ext = g1_ext.dot(pc_mat)
 tot_ext_patt = np.concatenate((g0_ext, g1_ext), axis=0)
 
-# Iperparameters PCA
-k = 5
-n_trees = 300
-n_iter = 100
-
 feat_counter = np.zeros(len(g0[0]))
 
 acc_list = []
@@ -242,10 +242,10 @@ sens_ext_list = []
 spec_ext_list = []
 
 print('Starting PCA iterations...')
-start_pca = clock.process_time()
+#start_pca = clock.process_time()
 for n in range(n_iter):
-    # print("Iteration: {}/{} \r".format(n, n_iter)),
-    print(f'Iteration: {n}/{n_iter}', end='\r' )
+    print("Iteration: {}/{} \r".format(n, n_iter)),
+    # print(f'Iteration: {n}/{n_iter}', end='\r' )
 
     models = []
 
@@ -254,7 +254,7 @@ for n in range(n_iter):
     fold_sensitivity = []
     fold_specificity = []
 
-    kf = KFold(n_splits = k, shuffle = True)
+    kf = KFold(n_splits = k_PCA, shuffle = True)
     indices = kf.split(tot_labels)
 
     vote_pos_ext = np.zeros(len(ext_labels))
@@ -268,7 +268,7 @@ for n in range(n_iter):
         test_pattern = tot_pattern[test_index]
         test_labels = tot_labels[test_index]
 
-        model = ens.RandomForestClassifier(n_estimators=n_trees, 
+        model = ens.RandomForestClassifier(n_estimators=n_trees_PCA, 
                                                    criterion='gini',
                                                    max_depth=None,
                                                    min_samples_split=2,
@@ -390,7 +390,7 @@ print("Performance of External test")
 print("Accuracy: {:.2%} +- {:.2%} Rel: {:.2%}".format(PCA_acc_ext, PCA_acc_ext_std, PCA_acc_ext_std/PCA_acc_ext))
 print("Sensitivity: {:.2%} +- {:.2%} Rel: {:.2%}".format(PCA_sens_ext, PCA_sens_ext_std, PCA_sens_ext_std/PCA_sens_ext))
 print("Specificity: {:.2%} +- {:.2%} Rel: {:.2%}".format(PCA_spec_ext, PCA_spec_ext_std, PCA_spec_ext_std/PCA_spec_ext))
-print("CPU Time:" + str((clock.process_time() - start_pca)))
+#print("CPU Time:" + str((clock.process_time() - start_pca)))
 print("\n")
 
 print('Cross Validation Statistics:')
@@ -411,3 +411,19 @@ print('Specificity t-stat: {:.2}, p-value: {:.2}\n'.format(ext_spec_res.statisti
 
 
 print("Tempo:" + str(round((clock.time() - start)/60)) + "'" + str(round((clock.time() - start)%60)) + "''")
+
+dict = {'Base CV Avg': [tot_acc, tot_sens, tot_spec],
+        'Base CV Std': [tot_acc_std, tot_sens_std, tot_spec_std],
+        'Base Ext Avg': [tot_acc_ext, tot_sens_ext, tot_spec_ext],
+        'Base Ext Std': [tot_acc_ext_std, tot_sens_ext_std, tot_spec_ext_std],
+        'PCA CV Avg': [PCA_acc, PCA_sens, PCA_spec],
+        'PCA CV Std': [PCA_acc_std, PCA_sens_std, PCA_spec_std],
+        'PCA Ext Avg': [PCA_acc_ext, PCA_sens_ext, PCA_spec_ext],
+        'PCA Ext Std': [PCA_acc_ext_std, PCA_sens_ext_std, PCA_spec_ext_std],
+        'CV t-test': [cross_acc_res.statistic, cross_sens_res.statistic, cross_spec_res.statistic],
+        'CV p-value': [cross_acc_res.pvalue, cross_sens_res.pvalue, cross_spec_res.pvalue],
+        'Ext t-test': [ext_acc_res.statistic, ext_sens_res.statistic, ext_spec_res.statistic],
+        'Ext p-value': [ext_acc_res.pvalue, ext_sens_res.pvalue, ext_spec_res.pvalue]}
+
+results = pd.DataFrame(data = dict, index = ['Accuracy', 'Sensitivity', 'Specificity'])
+results.to_csv('results.csv')
