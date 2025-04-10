@@ -251,7 +251,7 @@ def slider_graph(tree, plotted_metric, plotted_error, plot_title):
         if plotted_error is None:
             yerr = 0
         else:
-            yerr = plotted_metric[i][:, 0]
+            yerr = plotted_error[i][:, 0]
 
         ax[i].scatter(tree, plotted_metric[i][:, 0], color=ax_colors[i])
         ax[i].errorbar(tree, plotted_metric[i][:, 0], yerr=yerr, color=ax_colors[i])
