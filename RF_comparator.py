@@ -3,6 +3,7 @@ import sklearn.ensemble as ens
 import matplotlib.pyplot as plt
 import time as clock
 import pandas as pd
+import RF_Library as RF
 from scipy.stats import ttest_ind
 from sklearn.model_selection import KFold
 from scipy.io import loadmat
@@ -65,6 +66,7 @@ spec_list = []
 acc_ext_list = []
 sens_ext_list = []
 spec_ext_list = []
+conf_mat_list = []
 
 base_acc_bacc_list = []
 base_sens_bacc_list = []
@@ -228,19 +230,29 @@ for n in range(n_iter):
     ext_accuracy = 0.
     ext_sensitivity = 0.
     ext_specificity = 0.
+    conf_mat = np.zeros((2,2))
 
 
     for i, true_label in enumerate(ext_labels):
-        if vote_neg_ext[i]>=vote_pos_ext[i] and true_label == label0:
-            ext_accuracy += 1./(Npos_ext+Nneg_ext)
-            ext_specificity += 1./Nneg_ext
-        if vote_neg_ext[i]<vote_pos_ext[i] and true_label == label1:
-            ext_accuracy += 1./(Npos_ext+Nneg_ext)
-            ext_sensitivity += 1./Npos_ext
+        if vote_neg_ext[i]>=vote_pos_ext[i]:
+            if true_label == label1:
+                conf_mat[1][0] += 1
+            if true_label == label0:
+                ext_accuracy += 1./(Npos_ext+Nneg_ext)
+                ext_specificity += 1./Nneg_ext
+                conf_mat[1][1] += 1
+        if vote_neg_ext[i]<vote_pos_ext[i]:
+            if true_label == label1:
+                ext_accuracy += 1./(Npos_ext+Nneg_ext)
+                ext_sensitivity += 1./Npos_ext
+                conf_mat[0][0] += 1
+            if true_label == label0:
+                conf_mat[0][1] += 1
 
     acc_ext_list.append(ext_accuracy)
     sens_ext_list.append(ext_sensitivity)
     spec_ext_list.append(ext_specificity)
+    conf_mat_list.append(conf_mat)
 
     # Counting root feature in decision Trees
     
@@ -285,6 +297,8 @@ tot_sens_ext = np.mean(sens_ext_list)
 tot_sens_ext_std = np.std(sens_ext_list)/np.sqrt(n_iter)
 tot_spec_ext = np.mean(spec_ext_list)
 tot_spec_ext_std = np.std(spec_ext_list)/np.sqrt(n_iter)
+tot_conf_mat = np.empty((2,2))
+tot_conf_mat = np.mean(conf_mat_list, axis=0)
 
 print("Performance of External test: Majority vote")
 print("Accuracy: {:.2%} +- {:.2%} Rel: {:.2%}".format(tot_acc_ext, tot_acc_ext_std, tot_acc_ext_std/tot_acc_ext))
@@ -292,6 +306,9 @@ print("Sensitivity: {:.2%} +- {:.2%} Rel: {:.2%}".format(tot_sens_ext, tot_sens_
 print("Specificity: {:.2%} +- {:.2%} Rel: {:.2%}".format(tot_spec_ext, tot_spec_ext_std, tot_spec_ext_std/tot_spec_ext))
 #print("CPU Time:" + str((clock.process_time() - start_non_pca)))
 print("\n")
+
+fig_baseCM, ax_baseCM = RF.confMat_binary_plot(tot_conf_mat, title="Confusion Matrix - non PCA")
+fig_baseCM.savefig("nonPCA Confusion Matrix.pdf")
 
 tot_acc_bacc = np.mean(base_acc_bacc_list)
 tot_acc_bacc_std = np.std(base_acc_bacc_list)/np.sqrt(n_iter)
@@ -353,6 +370,7 @@ spec_list = []
 acc_ext_list = []
 sens_ext_list = []
 spec_ext_list = []
+conf_mat_list = []
 
 PCA_acc_bacc_list = []
 PCA_sens_bacc_list = []
@@ -515,19 +533,29 @@ for n in range(n_iter):
     ext_accuracy = 0.
     ext_sensitivity = 0.
     ext_specificity = 0.
+    conf_mat = np.zeros((2,2))
 
 
     for i, true_label in enumerate(ext_labels):
-        if vote_neg_ext[i]>=vote_pos_ext[i] and true_label == label0:
-            ext_accuracy += 1./(Npos_ext+Nneg_ext)
-            ext_specificity += 1./Nneg_ext
-        if vote_neg_ext[i]<vote_pos_ext[i] and true_label == label1:
-            ext_accuracy += 1./(Npos_ext+Nneg_ext)
-            ext_sensitivity += 1./Npos_ext
+        if vote_neg_ext[i]>=vote_pos_ext[i]:
+            if true_label == label1:
+                conf_mat[1][0] += 1
+            if true_label == label0:
+                ext_accuracy += 1./(Npos_ext+Nneg_ext)
+                ext_specificity += 1./Nneg_ext
+                conf_mat[1][1] += 1
+        if vote_neg_ext[i]<vote_pos_ext[i]:
+            if true_label == label1:
+                ext_accuracy += 1./(Npos_ext+Nneg_ext)
+                ext_sensitivity += 1./Npos_ext
+                conf_mat[0][0] += 1
+            if true_label == label0:
+                conf_mat[0][1] += 1
 
     acc_ext_list.append(ext_accuracy)
     sens_ext_list.append(ext_sensitivity)
     spec_ext_list.append(ext_specificity)
+    conf_mat_list.append(conf_mat)
 
     # Counting root feature in decision Trees
     
@@ -572,6 +600,8 @@ PCA_sens_ext = np.mean(sens_ext_list)
 PCA_sens_ext_std = np.std(sens_ext_list)/np.sqrt(n_iter)
 PCA_spec_ext = np.mean(spec_ext_list)
 PCA_spec_ext_std = np.std(spec_ext_list)/np.sqrt(n_iter)
+PCA_conf_mat = np.empty((2,2))
+PCA_conf_mat = np.mean(conf_mat_list, axis=0)
 
 print("Performance of External test: Majority vote")
 print("Accuracy: {:.2%} +- {:.2%} Rel: {:.2%}".format(PCA_acc_ext, PCA_acc_ext_std, PCA_acc_ext_std/PCA_acc_ext))
@@ -579,6 +609,9 @@ print("Sensitivity: {:.2%} +- {:.2%} Rel: {:.2%}".format(PCA_sens_ext, PCA_sens_
 print("Specificity: {:.2%} +- {:.2%} Rel: {:.2%}".format(PCA_spec_ext, PCA_spec_ext_std, PCA_spec_ext_std/PCA_spec_ext))
 #print("CPU Time:" + str((clock.process_time() - start_pca)))
 print("\n")
+
+fig_PCACM, ax_PCACM = RF.confMat_binary_plot(PCA_conf_mat, title="Confusion matrix - PCA")
+fig_PCACM.savefig("PCA Confusion Matrix.pdf")
 
 PCA_acc_bacc = np.mean(PCA_acc_bacc_list)
 PCA_acc_bacc_std = np.std(PCA_acc_bacc_list)/np.sqrt(n_iter)
@@ -696,3 +729,4 @@ dict = {'Base CV Avg': [tot_acc, tot_sens, tot_spec],
 
 results = pd.DataFrame(data = dict, index = ['Accuracy', 'Sensitivity', 'Specificity'])
 results.to_csv('results.csv')
+plt.show()

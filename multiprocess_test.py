@@ -1,5 +1,7 @@
 import numpy as np
 import time as clock
+import matplotlib.pyplot as plt
+import RF_Library as RF
 
 import multiprocessing as mp
 import os
@@ -81,4 +83,10 @@ if __name__ == '__main__':
     print("Total number of cpu: {}".format(tot_cpu))
     available_cpu = os.cpu_count()
     print("Available number of cpu: {}".format(available_cpu))
-    test()
+    # test()
+
+    
+    mat = ((19, 4),(3, 18))
+    figCM, axCM = RF.confMat_binary_plot(mat)
+
+    plt.show()

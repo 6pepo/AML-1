@@ -1,6 +1,8 @@
 import numpy as np
 import sklearn.ensemble as ens
 import multiprocessing as mp
+import matplotlib.pyplot as plt
+import matplotlib.table as tab
 from sklearn.model_selection import KFold
 
 
@@ -151,4 +153,67 @@ def RF_binary_scanner(tree_range, k_range, patterns, labels, label0, label1, ext
 
 
 
+
+def confMat_binary_plot(conf_mat, accuracy=None, sensitivity=None, specificity=None, precision=None, title=None):
+    fig, ax = plt.subplots()
+    if title == None:
+        ax.set_title("Confusion matrix")
+    else:
+        ax.set_title(title)
+    ax.axis('off')
+    fig.frameon = False
+    
+    tot = conf_mat[0][0]+conf_mat[0][1]+conf_mat[1][0]+conf_mat[1][1]
+    if precision == None:
+        precision = conf_mat[0][0] / (conf_mat[0][0]+conf_mat[0][1])
+    if sensitivity == None:
+        sensitivity = conf_mat[0][0] / (conf_mat[0][0]+conf_mat[1][0])
+    if specificity == None:
+        specificity = conf_mat[1][1] / (conf_mat[1][1]+conf_mat[0][1])
+    if accuracy == None:
+        accuracy = (conf_mat[0][0] + conf_mat[1][1]) / tot
+    F1score = 2. * (precision * sensitivity) / (precision + sensitivity)
+
+    table = tab.Table(ax, loc='upper center')
+    table.auto_set_font_size(False)
+    fontproperties = {'family': 'sans-serif',
+                      'style': 'normal',
+                      'variant': 'normal',
+                      'stretch': 'normal',
+                      'weight': 'normal',
+                      'size': 'medium',
+                      'math_fontfamily': 'dejavusans'}
+
+    table.add_cell(0,2, width = 0.3, height = 0.1, text='Actual', loc='right', fontproperties = fontproperties)
+    table[0,2].visible_edges = 'BTL'
+    table.add_cell(0,3, width = 0.3, height = 0.1, text='Condition', loc='left', fontproperties = fontproperties)
+    table[0,3].visible_edges = 'BTR'
+
+    table.add_cell(1,1, width = 0.2, height = 0.2, text='Total\n\n'+str(tot), loc='center', fontproperties = fontproperties)
+    table.add_cell(1,2, width = 0.3, height = 0.2, text='Positive\n\n'+str(conf_mat[0][0]+conf_mat[1][0]), loc='center', fontproperties = fontproperties)
+    table.add_cell(1,3, width = 0.3, height = 0.2, text='Negative\n\n'+str(conf_mat[0][1]+conf_mat[1][1]), loc='center', fontproperties = fontproperties)
+
+    table.add_cell(2,0, width = 0.1, height = 0.3, text='Classifier', loc='center', fontproperties = fontproperties)
+    table[2,0].set_text_props(rotation = 'vertical')
+    table[2,0].visible_edges = 'LTR'
+    table.add_cell(2,1, width = 0.2, height = 0.3, text='Positive\n\n'+str(conf_mat[0][0]+conf_mat[0][1]), loc='center', fontproperties = fontproperties)
+    table.add_cell(2,2, width = 0.3, height = 0.3, text=str(conf_mat[0][0]), loc='center', fontproperties = fontproperties)
+    table.add_cell(2,3, width = 0.3, height = 0.3, text=str(conf_mat[0][1]), loc='center', fontproperties = fontproperties)
+    table.add_cell(2,4, width = 0.2, height = 0.3, text='Precision\n\n{:.2}'.format(precision), loc='center', fontproperties = fontproperties)
+
+    table.add_cell(3,0, width = 0.1, height = 0.3, text='Output of', loc='center', fontproperties = fontproperties)
+    table[3,0].set_text_props(rotation = 'vertical')
+    table[3,0].visible_edges = 'BLR'
+    table.add_cell(3,1, width = 0.2, height = 0.3, text='Negative\n\n'+str(conf_mat[1][0]+conf_mat[1][1]), loc='center', fontproperties = fontproperties)
+    table.add_cell(3,2, width = 0.3, height = 0.3, text=str(conf_mat[1][0]), loc='center', fontproperties = fontproperties)
+    table.add_cell(3,3, width = 0.3, height = 0.3, text=str(conf_mat[1][1]), loc='center', fontproperties = fontproperties)
+    table.add_cell(3,4, width = 0.2, height = 0.3)
+
+    table.add_cell(4,2, width = 0.3, height = 0.2, text='Sensitivity\n\n{:.2}'.format(sensitivity), loc='center', fontproperties = fontproperties)
+    table.add_cell(4,3, width = 0.3, height = 0.2, text='Specificity\n\n{:.2}'.format(specificity), loc='center', fontproperties = fontproperties)
+    table.add_cell(4,4, width = 0.2, height = 0.2, text='Acc: {:.2}\n\nF1: {:.2}'.format(accuracy, F1score), loc='center', fontproperties = fontproperties)
+    
+    ax.add_table(table)
+
+    return fig, ax
 
