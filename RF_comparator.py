@@ -3,22 +3,23 @@ import sklearn.ensemble as ens
 import matplotlib.pyplot as plt
 import time as clock
 import pandas as pd
-import RF_Library as RF
 from scipy.stats import ttest_ind
 from sklearn.model_selection import KFold
 from scipy.io import loadmat
 
+import RF_Library as RF     # Custom made functions
+
 start = clock.time()
 
-n_iter = 100
+n_iter = 1000
 
 # Iperparameters non-PCA
-k = 7
-n_trees = 245
+k = 6
+n_trees = 200
 
 # Iperparameters PCA
-k_PCA = 5
-n_trees_PCA = 150
+k_PCA = 6
+n_trees_PCA = 250
 
 
     #NON PCA
@@ -48,7 +49,7 @@ data = loadmat(path_file)
 
 g0_ext = data['g__0']
 g1_ext = data['g__1']
-tot_ext_patt = np.concatenate((g0_ext, g1_ext), axis=0)
+ext_patt = np.concatenate((g0_ext, g1_ext), axis=0)
 
 Nneg_ext = len(g0_ext)
 Npos_ext = len(g1_ext)
@@ -59,204 +60,58 @@ ext_labels = np.concatenate((g0_ext_labels, g1_ext_labels), axis=0)
 
 feat_counter = np.zeros(len(g0[0]))
 
-acc_list = []
+acc_list = []                   #CV metrics
 sens_list = []
 spec_list = []
 
-acc_ext_list = []
+acc_ext_list = []               #Majority vote
 sens_ext_list = []
 spec_ext_list = []
 conf_mat_list = []
 
-base_acc_bacc_list = []
+base_acc_bacc_list = []         #Best Accuracy in training
 base_sens_bacc_list = []
 base_spec_bacc_list = []
 
-base_acc_bsens_list = []
+base_acc_bsens_list = []        #Best Sensitivity in training
 base_sens_bsens_list = []
 base_spec_bsens_list = []
 
-base_acc_bspec_list = []
+base_acc_bspec_list = []        #Best Specificity in training
 base_sens_bspec_list = []
 base_spec_bspec_list = []
 
 print('Starting Non-PCA iterations...')
-#start_non_pca = clock.process_time()                               #CPU time is different in 2.7-
+start_non_pca = clock.process_time()                               #CPU time is different in 2.7-
 for n in range(n_iter):
     # print("Iteration: {}/{} \r".format(n+1, n_iter)),
     print(f'Iteration: {n+1}/{n_iter}', end='\r' )
 
-    models = []
+    res = RF.RF_binary_kfold(n_trees, k, tot_pattern, tot_labels, label0, label1, ext_patt, ext_labels)
 
-    # Metrics
-    fold_accuracy = []
-    fold_sensitivity = []
-    fold_specificity = []
+    acc_list.append(res['Acc'])
+    sens_list.append(res['Sens'])
+    spec_list.append(res['Spec'])
 
-    kf = KFold(n_splits = k, shuffle = True)
-    indices = kf.split(tot_labels)
+    base_acc_bacc_list.append(res['BAcc Acc'])
+    base_sens_bacc_list.append(res['BAcc Sens'])
+    base_spec_bacc_list.append(res['BAcc Spec'])
 
-    vote_pos_ext = np.zeros(len(ext_labels))
-    vote_neg_ext = np.zeros(len(ext_labels))
+    base_acc_bsens_list.append(res['BSens Acc'])
+    base_sens_bsens_list.append(res['BSens Sens'])
+    base_spec_bsens_list.append(res['BSens Spec'])
 
-    for i, (train_index, test_index) in enumerate(indices):
+    base_acc_bspec_list.append(res['BSpec Acc'])
+    base_sens_bspec_list.append(res['BSpec Sens'])
+    base_spec_bspec_list.append(res['BSpec Spec'])
 
-        train_pattern = tot_pattern[train_index]
-        train_labels = tot_labels[train_index]
-
-        test_pattern = tot_pattern[test_index]
-        test_labels = tot_labels[test_index]
-
-        model = ens.RandomForestClassifier(n_estimators=n_trees, 
-                                                   criterion='gini',
-                                                   max_depth=None,
-                                                   min_samples_split=2,
-                                                   min_samples_leaf=1, 
-                                                   min_weight_fraction_leaf=0.0, 
-                                                   max_features='sqrt', 
-                                                   max_leaf_nodes=None, 
-                                                   min_impurity_decrease=0.0, 
-                                                   bootstrap=True)
-
-        model.fit(train_pattern, train_labels)
-        models.append(model)
-
-        test_prediction = model.predict(test_pattern)
-
-        temp_Npos = 0
-        temp_Nneg = 0
-
-        for t_lab in test_labels:
-            if t_lab == label1:
-                temp_Npos += 1
-            if t_lab == label0:
-                temp_Nneg += 1
-
-        temp_accuracy = 0.
-        temp_sensitivity = 0.
-        temp_specificity = 0.
-
-        for j, pred in enumerate(test_prediction):
-            if pred == label1 and test_labels[j] == label1:
-                temp_accuracy += 1./(temp_Npos+temp_Nneg)
-                temp_sensitivity += 1./temp_Npos
-    
-            if pred == label0 and test_labels[j] == label0:
-                temp_accuracy += 1./(temp_Npos+temp_Nneg)
-                temp_specificity += 1./temp_Nneg
-
-        fold_accuracy.append(temp_accuracy)
-        fold_sensitivity.append(temp_sensitivity)
-        fold_specificity.append(temp_specificity)
-
-        # External test: Majority vote
-        ext_prediction = model.predict(tot_ext_patt)
-
-        for j, pred in enumerate(ext_prediction):
-            if pred == label0:
-                vote_neg_ext[j] += 1
-            if pred == label1:
-                vote_pos_ext[j] += 1
-
-    acc_list.append(np.mean(fold_accuracy))
-    sens_list.append(np.mean(fold_sensitivity))
-    spec_list.append(np.mean(fold_specificity))
-
-
-    # Performance of External Test: Best in Training
-
-    bacc_model = models[np.argmax(fold_accuracy)]
-    bacc_accuracy = 0.
-    bacc_sensitivity = 0.
-    bacc_specificity = 0.
-    bacc_predict = bacc_model.predict(tot_ext_patt)
-
-    for j, pred in enumerate(bacc_predict):
-        if pred == label1 and ext_labels[j] == label1:
-            bacc_accuracy += 1./(Npos_ext+Nneg_ext)
-            bacc_specificity += 1./Nneg_ext
-    
-        if pred == label0 and ext_labels[j] == label0:
-            bacc_accuracy += 1./(Npos_ext+Nneg_ext)
-            bacc_sensitivity += 1./Npos_ext
-
-    base_acc_bacc_list.append(bacc_accuracy)
-    base_sens_bacc_list.append(bacc_sensitivity)
-    base_spec_bacc_list.append(bacc_specificity)
-
-
-    bsens_model = models[np.argmax(fold_sensitivity)]
-    bsens_accuracy = 0.
-    bsens_sensitivity = 0.
-    bsens_specificity = 0.
-    bsens_predict = bsens_model.predict(tot_ext_patt)
-
-    for j, pred in enumerate(bsens_predict):
-        if pred == label1 and ext_labels[j] == label1:
-            bsens_accuracy += 1./(Npos_ext+Nneg_ext)
-            bsens_specificity += 1./Nneg_ext
-    
-        if pred == label0 and ext_labels[j] == label0:
-            bsens_accuracy += 1./(Npos_ext+Nneg_ext)
-            bsens_sensitivity += 1./Npos_ext
-
-    base_acc_bsens_list.append(bsens_accuracy)
-    base_sens_bsens_list.append(bsens_sensitivity)
-    base_spec_bsens_list.append(bsens_specificity)
-
-
-    bspec_model = models[np.argmax(fold_specificity)]
-    bspec_accuracy = 0.
-    bspec_sensitivity = 0.
-    bspec_specificity = 0.
-    bspec_predict = bspec_model.predict(tot_ext_patt)
-
-    for j, pred in enumerate(bspec_predict):
-        if pred == label1 and ext_labels[j] == label1:
-            bspec_accuracy += 1./(Npos_ext+Nneg_ext)
-            bspec_specificity += 1./Nneg_ext
-    
-        if pred == label0 and ext_labels[j] == label0:
-            bspec_accuracy += 1./(Npos_ext+Nneg_ext)
-            bspec_sensitivity += 1./Npos_ext
-
-    base_acc_bspec_list.append(bspec_accuracy)
-    base_sens_bspec_list.append(bspec_sensitivity)
-    base_spec_bspec_list.append(bspec_specificity)
-
-
-    # Performance of External Test: Majority Vote
-
-    ext_accuracy = 0.
-    ext_sensitivity = 0.
-    ext_specificity = 0.
-    conf_mat = np.zeros((2,2))
-
-
-    for i, true_label in enumerate(ext_labels):
-        if vote_neg_ext[i]>=vote_pos_ext[i]:
-            if true_label == label1:
-                conf_mat[1][0] += 1
-            if true_label == label0:
-                ext_accuracy += 1./(Npos_ext+Nneg_ext)
-                ext_specificity += 1./Nneg_ext
-                conf_mat[1][1] += 1
-        if vote_neg_ext[i]<vote_pos_ext[i]:
-            if true_label == label1:
-                ext_accuracy += 1./(Npos_ext+Nneg_ext)
-                ext_sensitivity += 1./Npos_ext
-                conf_mat[0][0] += 1
-            if true_label == label0:
-                conf_mat[0][1] += 1
-
-    acc_ext_list.append(ext_accuracy)
-    sens_ext_list.append(ext_sensitivity)
-    spec_ext_list.append(ext_specificity)
-    conf_mat_list.append(conf_mat)
+    acc_ext_list.append(res['Ext Acc'])
+    sens_ext_list.append(res['Ext Sens'])
+    spec_ext_list.append(res['Ext Spec'])
+    conf_mat_list.append(res['Conf Mat'])
 
     # Counting root feature in decision Trees
-    
-    for model in models:
+    for model in res['models']:
         for estim in model.estimators_:
             feat_counter[estim.tree_.feature[0]] += 1
 print('Done!                                  ')
@@ -304,7 +159,7 @@ print("Performance of External test: Majority vote")
 print("Accuracy: {:.2%} +- {:.2%} Rel: {:.2%}".format(tot_acc_ext, tot_acc_ext_std, tot_acc_ext_std/tot_acc_ext))
 print("Sensitivity: {:.2%} +- {:.2%} Rel: {:.2%}".format(tot_sens_ext, tot_sens_ext_std, tot_sens_ext_std/tot_sens_ext))
 print("Specificity: {:.2%} +- {:.2%} Rel: {:.2%}".format(tot_spec_ext, tot_spec_ext_std, tot_spec_ext_std/tot_spec_ext))
-#print("CPU Time:" + str((clock.process_time() - start_non_pca)))
+print("CPU Time:" + str((clock.process_time() - start_non_pca)))
 print("\n")
 
 fig_baseCM, ax_baseCM = RF.confMat_binary_plot(tot_conf_mat, title="Confusion Matrix - non PCA")
@@ -349,7 +204,7 @@ print("Sensitivity: {:.2%} +- {:.2%} Rel: {:.2%}".format(tot_sens_bspec, tot_sen
 print("Specificity: {:.2%} +- {:.2%} Rel: {:.2%}".format(tot_spec_bspec, tot_spec_bspec_std, tot_spec_bspec_std/tot_spec_bspec))
 print("\n")
 
-#PCA
+    #PCA
 
 pc_mat = pd.read_csv("eigenvectors.csv", sep = ',', index_col=0)
 
@@ -359,207 +214,62 @@ tot_pattern = np.concatenate((g0, g1), axis=0)
 
 g0_ext = g0_ext.dot(pc_mat)
 g1_ext = g1_ext.dot(pc_mat)
-tot_ext_patt = np.concatenate((g0_ext, g1_ext), axis=0)
+ext_patt = np.concatenate((g0_ext, g1_ext), axis=0)
 
 feat_counter = np.zeros(len(g0[0]))
 
-acc_list = []
+acc_list = []                   #CV metrics
 sens_list = []
 spec_list = []
 
-acc_ext_list = []
+acc_ext_list = []               #Majority vote
 sens_ext_list = []
 spec_ext_list = []
 conf_mat_list = []
 
-PCA_acc_bacc_list = []
+PCA_acc_bacc_list = []          #Best Accuracy in training
 PCA_sens_bacc_list = []
 PCA_spec_bacc_list = []
 
-PCA_acc_bsens_list = []
+PCA_acc_bsens_list = []         #Best sensitivity in Training
 PCA_sens_bsens_list = []
 PCA_spec_bsens_list = []
 
-PCA_acc_bspec_list = []
+PCA_acc_bspec_list = []         #Best Specificity in training
 PCA_sens_bspec_list = []
 PCA_spec_bspec_list = []
 
 print('Starting PCA iterations...')
-#start_pca = clock.process_time()
+start_pca = clock.process_time()
 for n in range(n_iter):
     # print("Iteration: {}/{} \r".format(n+1, n_iter)),
     print(f'Iteration: {n+1}/{n_iter}', end='\r' )
 
-    models = []
+    res = RF.RF_binary_kfold(n_trees_PCA, k_PCA, tot_pattern, tot_labels, label0, label1, ext_patt, ext_labels)
 
-    # Metrics
-    fold_accuracy = []
-    fold_sensitivity = []
-    fold_specificity = []
+    acc_list.append(res['Acc'])
+    sens_list.append(res['Sens'])
+    spec_list.append(res['Spec'])
 
-    kf = KFold(n_splits = k_PCA, shuffle = True)
-    indices = kf.split(tot_labels)
+    PCA_acc_bacc_list.append(res['BAcc Acc'])
+    PCA_sens_bacc_list.append(res['Bcc Sens'])
+    PCA_spec_bacc_list.append(res['BAcc Spec'])
 
-    vote_pos_ext = np.zeros(len(ext_labels))
-    vote_neg_ext = np.zeros(len(ext_labels))
+    PCA_acc_bsens_list.append(res['BSens Acc'])
+    PCA_sens_bsens_list.append(res['BSens Sens'])
+    PCA_spec_bsens_list.append(res['BSens Spec'])
 
-    for i, (train_index, test_index) in enumerate(indices):
+    PCA_acc_bspec_list.append(res['BSpec Acc'])
+    PCA_sens_bspec_list.append(res['BSpec Sens'])
+    PCA_spec_bspec_list.append(res['BSpec Spec'])
 
-        train_pattern = tot_pattern[train_index]
-        train_labels = tot_labels[train_index]
-
-        test_pattern = tot_pattern[test_index]
-        test_labels = tot_labels[test_index]
-
-        model = ens.RandomForestClassifier(n_estimators=n_trees_PCA, 
-                                                   criterion='gini',
-                                                   max_depth=None,
-                                                   min_samples_split=2,
-                                                   min_samples_leaf=1, 
-                                                   min_weight_fraction_leaf=0.0, 
-                                                   max_features='sqrt', 
-                                                   max_leaf_nodes=None, 
-                                                   min_impurity_decrease=0.0, 
-                                                   bootstrap=True)
-
-        model.fit(train_pattern, train_labels)
-        models.append(model)
-
-        test_prediction = model.predict(test_pattern)
-
-        temp_Npos = 0
-        temp_Nneg = 0
-
-        for t_lab in test_labels:
-            if t_lab == label1:
-                temp_Npos += 1
-            if t_lab == label0:
-                temp_Nneg += 1
-
-        temp_accuracy = 0.
-        temp_sensitivity = 0.
-        temp_specificity = 0.
-
-        for j, pred in enumerate(test_prediction):
-            if pred == label1 and test_labels[j] == label1:
-                temp_accuracy += 1./(temp_Npos+temp_Nneg)
-                temp_sensitivity += 1./temp_Npos
-    
-            if pred == label0 and test_labels[j] == label0:
-                temp_accuracy += 1./(temp_Npos+temp_Nneg)
-                temp_specificity += 1./temp_Nneg
-
-        fold_accuracy.append(temp_accuracy)
-        fold_sensitivity.append(temp_sensitivity)
-        fold_specificity.append(temp_specificity)
-
-        # External test: Majority vote
-        ext_prediction = model.predict(tot_ext_patt)
-
-        for j, pred in enumerate(ext_prediction):
-            if pred == label0:
-                vote_neg_ext[j] += 1
-            if pred == label1:
-                vote_pos_ext[j] += 1
-
-    acc_list.append(np.mean(fold_accuracy))
-    sens_list.append(np.mean(fold_sensitivity))
-    spec_list.append(np.mean(fold_specificity))
-
-    # Performance of External Test: Best in Training
-
-    bacc_model = models[np.argmax(fold_accuracy)]
-    bacc_accuracy = 0.
-    bacc_sensitivity = 0.
-    bacc_specificity = 0.
-    bacc_predict = bacc_model.predict(tot_ext_patt)
-
-    for j, pred in enumerate(bacc_predict):
-        if pred == label1 and ext_labels[j] == label1:
-            bacc_accuracy += 1./(Npos_ext+Nneg_ext)
-            bacc_specificity += 1./Nneg_ext
-    
-        if pred == label0 and ext_labels[j] == label0:
-            bacc_accuracy += 1./(Npos_ext+Nneg_ext)
-            bacc_sensitivity += 1./Npos_ext
-
-    PCA_acc_bacc_list.append(bacc_accuracy)
-    PCA_sens_bacc_list.append(bacc_sensitivity)
-    PCA_spec_bacc_list.append(bacc_specificity)
-
-
-    bsens_model = models[np.argmax(fold_sensitivity)]
-    bsens_accuracy = 0.
-    bsens_sensitivity = 0.
-    bsens_specificity = 0.
-    bsens_predict = bsens_model.predict(tot_ext_patt)
-
-    for j, pred in enumerate(bsens_predict):
-        if pred == label1 and ext_labels[j] == label1:
-            bsens_accuracy += 1./(Npos_ext+Nneg_ext)
-            bsens_specificity += 1./Nneg_ext
-    
-        if pred == label0 and ext_labels[j] == label0:
-            bsens_accuracy += 1./(Npos_ext+Nneg_ext)
-            bsens_sensitivity += 1./Npos_ext
-
-    PCA_acc_bsens_list.append(bsens_accuracy)
-    PCA_sens_bsens_list.append(bsens_sensitivity)
-    PCA_spec_bsens_list.append(bsens_specificity)
-
-
-    bspec_model = models[np.argmax(fold_specificity)]
-    bspec_accuracy = 0.
-    bspec_sensitivity = 0.
-    bspec_specificity = 0.
-    bspec_predict = bspec_model.predict(tot_ext_patt)
-
-    for j, pred in enumerate(bspec_predict):
-        if pred == label1 and ext_labels[j] == label1:
-            bspec_accuracy += 1./(Npos_ext+Nneg_ext)
-            bspec_specificity += 1./Nneg_ext
-    
-        if pred == label0 and ext_labels[j] == label0:
-            bspec_accuracy += 1./(Npos_ext+Nneg_ext)
-            bspec_sensitivity += 1./Npos_ext
-
-    PCA_acc_bspec_list.append(bspec_accuracy)
-    PCA_sens_bspec_list.append(bspec_sensitivity)
-    PCA_spec_bspec_list.append(bspec_specificity)
-
-
-    # Performance of External Test: Majority Vote
-
-    ext_accuracy = 0.
-    ext_sensitivity = 0.
-    ext_specificity = 0.
-    conf_mat = np.zeros((2,2))
-
-
-    for i, true_label in enumerate(ext_labels):
-        if vote_neg_ext[i]>=vote_pos_ext[i]:
-            if true_label == label1:
-                conf_mat[1][0] += 1
-            if true_label == label0:
-                ext_accuracy += 1./(Npos_ext+Nneg_ext)
-                ext_specificity += 1./Nneg_ext
-                conf_mat[1][1] += 1
-        if vote_neg_ext[i]<vote_pos_ext[i]:
-            if true_label == label1:
-                ext_accuracy += 1./(Npos_ext+Nneg_ext)
-                ext_sensitivity += 1./Npos_ext
-                conf_mat[0][0] += 1
-            if true_label == label0:
-                conf_mat[0][1] += 1
-
-    acc_ext_list.append(ext_accuracy)
-    sens_ext_list.append(ext_sensitivity)
-    spec_ext_list.append(ext_specificity)
-    conf_mat_list.append(conf_mat)
+    acc_ext_list.append(res['Ext Acc'])
+    sens_ext_list.append(res['Ext Sens'])
+    spec_ext_list.append(res['Ext Spec'])
+    conf_mat_list.append(res['Conf Mat'])
 
     # Counting root feature in decision Trees
-    
-    for model in models:
+    for model in res['models']:
         for estim in model.estimators_:
             feat_counter[estim.tree_.feature[0]] += 1
 print('Done!                                  ')
@@ -607,7 +317,7 @@ print("Performance of External test: Majority vote")
 print("Accuracy: {:.2%} +- {:.2%} Rel: {:.2%}".format(PCA_acc_ext, PCA_acc_ext_std, PCA_acc_ext_std/PCA_acc_ext))
 print("Sensitivity: {:.2%} +- {:.2%} Rel: {:.2%}".format(PCA_sens_ext, PCA_sens_ext_std, PCA_sens_ext_std/PCA_sens_ext))
 print("Specificity: {:.2%} +- {:.2%} Rel: {:.2%}".format(PCA_spec_ext, PCA_spec_ext_std, PCA_spec_ext_std/PCA_spec_ext))
-#print("CPU Time:" + str((clock.process_time() - start_pca)))
+print("CPU Time:" + str((clock.process_time() - start_pca)))
 print("\n")
 
 fig_PCACM, ax_PCACM = RF.confMat_binary_plot(PCA_conf_mat, title="Confusion matrix - PCA")

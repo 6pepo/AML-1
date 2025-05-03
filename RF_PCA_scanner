@@ -80,11 +80,6 @@ ext_accuracy_list_r = np.zeros((len_tree, len_k))
 ext_sensitivity_list_r = np.zeros((len_tree, len_k))
 ext_specificity_list_r = np.zeros((len_tree, len_k))
 
-# Metrics
-fold_accuracy = []
-fold_sensitivity = []
-fold_specificity = []
-
 vote_pos_ext = np.zeros(len(ext_labels))
 vote_neg_ext = np.zeros(len(ext_labels))
 
