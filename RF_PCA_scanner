@@ -294,7 +294,7 @@ def colormap_plot(k_range, tree_range, plotted_metric, plot_title, norm):
     image = [0, 0, 0]
     for j in range(0, 3):
         ax[j] = fig3d.add_subplot(locations[j])
-        image[j] = ax[j].pcolormesh(X, Y, accuracy_list, vmin=vmin, vmax=vmax, cmap=cm.plasma)
+        image[j] = ax[j].pcolormesh(X, Y, plotted_metric[j], vmin=vmin, vmax=vmax, cmap=cm.plasma)
         ax[j].set_ylabel("Number of trees")
         ax[j].set_xlabel("Number of folds")
         ax[j].set_title(ax_titles[j])
