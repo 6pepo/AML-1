@@ -267,7 +267,7 @@ def plot_histo_gaus_stat(dist1, label1, dist2, label2):
     ax.plot(x, gaussian(x,*popt1), 'r--', label=f'Gaussian Fit: A = {popt1[0]:.2f}, $\mu$ = {popt1[1]:.2f}, $\sigma$ = {popt1[2]:.2f}')
     ax.plot(x, gaussian(x,*popt2), 'b--', label=f'Gaussian Fit: A = {popt2[0]:.2f}, $\mu$ = {popt2[1]:.2f}, $\sigma$ = {popt2[2]:.2f}')
 
-    stat_res = ttest_ind(dist1, dist2 ,equal_var=check_var(popt1[2], popt2[2]), alternative=hp_mode(popt1[1], popt2[1]), trim=0.23)
+    stat_res = ttest_ind(dist1, dist2 ,equal_var=check_var(popt1[2], popt2[2]), alternative=hp_mode(popt1[1], popt2[1]))
 
 
     ax.plot([],[], marker= None, linestyle='None', label=f't-stat: {stat_res.statistic:.2f}, p-value: {stat_res.pvalue:.2f}')
