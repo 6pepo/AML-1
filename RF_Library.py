@@ -9,6 +9,7 @@ from sklearn.model_selection import KFold
 from scipy.optimize import curve_fit
 from scipy.stats import ttest_ind
 from matplotlib import cm, colors
+from tqdm import tqdm
 
 def RF_binary_kfold(n_trees, k, patterns, labels, label0, label1, ext_patt = None, ext_lab = None):
     
@@ -202,46 +203,47 @@ def RF_binary_kfold(n_trees, k, patterns, labels, label0, label1, ext_patt = Non
 
     return res
 
-def RF_binary_scanner(tree_range, k_range, patterns, labels, label0, label1, ext_patt = None, ext_lab = None):
+def RF_binary_scanner(tree_range, k_range, n_seeds, patterns, labels, label0, label1, ext_patt = None, ext_lab = None):
     len_tree = len(tree_range)
     len_k = len(k_range)
 
-    accuracy_list = np.empty((len_tree, len_k))
-    accuracy_err_list = np.empty((len_tree, len_k))
-    sensitivity_list = np.empty((len_tree, len_k))
-    sensitivity_err_list = np.empty((len_tree, len_k))
-    specificity_list = np.empty((len_tree, len_k))
-    specificity_err_list = np.empty((len_tree, len_k))
+    accuracy_list = np.empty((len_tree, len_k, n_seeds))
+    sensitivity_list = np.empty((len_tree, len_k, n_seeds))
+    specificity_list = np.empty((len_tree, len_k, n_seeds))
 
     print("Begin Scanning...")
 
     tot_iter = len_tree*len_k
+    progress = tqdm(total=tot_iter)
     iter = 0
 
-    for i_trees, n_trees in enumerate(tree_range):
-        for i_k, k in enumerate(k_range):
-            iter += 1
-            print("N_trees: ", n_trees, "\tN_fold: ", k, "\tIteration: ", iter, "/", tot_iter,end='\r')     #Python 3.x
-            # print("N_trees: {}\tN_fold: {}\tIteration: {}/{} \r".format(n_trees, k, iter, tot_iter)),       #Python 2.x
+    for i in range(n_seeds):
+        for i_trees, n_trees in enumerate(tree_range):
+            for i_k, k in enumerate(k_range):
+                iter += 1
+                
+                # Progress bar
+                progress.set_description(f"Trees: {i_trees+1}/{len_tree} | Fold: {i_k+1}/{len_k} | Rand_state: {i+1}/{n_seeds}")
+                progress.update(1)
+                
+                # print("N_trees: ", n_trees, "\tN_fold: ", k, "\tIteration: ", iter, "/", tot_iter,end='\r')     #Python 3.x
+                # print("N_trees: {}\tN_fold: {}\tIteration: {}/{} \r".format(n_trees, k, iter, tot_iter)),       #Python 2.x
 
-            res = RF_binary_kfold(n_trees, k, patterns, labels, label0, label1)
+                res = RF_binary_kfold(n_trees, k, patterns, labels, label0, label1)
 
-            accuracy_list[i_trees, i_k] = res['Acc']
-            accuracy_err_list[i_trees, i_k] = res['Acc Err']
-            sensitivity_list[i_trees, i_k] = res['Sens']
-            sensitivity_err_list[i_trees, i_k] = res['Sens Err']
-            specificity_list[i_trees, i_k] = res['Spec']
-            specificity_err_list[i_trees, i_k] = res['Spec Err']
+                accuracy_list[i_trees, i_k, i] = res['Acc']
+                sensitivity_list[i_trees, i_k, i] = res['Sens']
+                specificity_list[i_trees, i_k, i] = res['Spec']
 
     print("Finished Scanning!                                                \n")
 
     res = {
-        'Acc List': accuracy_list,
-        'Acc Err List': accuracy_err_list,
-        'Sens List': sensitivity_list,
-        'Sens Err List': sensitivity_err_list,
-        'Spec List': specificity_list,
-        'Spec Err List': specificity_err_list
+        'Acc List': np.mean(accuracy_list, axis=2),
+        'Acc Std List': np.std(accuracy_list, axis=2),
+        'Sens List': np.mean(sensitivity_list, axis=2),
+        'Sens Std List': np.std(sensitivity_list, axis=2),
+        'Spec List': np.mean(specificity_list, axis=2),
+        'Spec Std List': np.std(specificity_list, axis=2)
     }
 
     return res
