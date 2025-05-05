@@ -1,6 +1,7 @@
 import numpy as np
 import matplotlib.pyplot as plt
 import time as clock
+import pandas as pd
 
 from matplotlib import cm, colors
 from matplotlib.widgets import Slider
@@ -10,14 +11,16 @@ import RF_Library as RF
 
 start = clock.time()
 
+pc_mat = pd.read_csv("eigenvectors.csv", sep=',', index_col=0)
+pc_mat = pc_mat.to_numpy()
+
 path_file = "signal__b.mat"
 
 data = loadmat(path_file)
 
-g0 = data['g__0']
-g1 = data['g__1']
+g0 = data['g__0'].dot(pc_mat)
+g1 = data['g__1'].dot(pc_mat)
 tot_pattern = np.concatenate((g0, g1), axis=0)
-
 
 Nneg = len(g0[:, 0])
 Npos = len(g1[:, 0])

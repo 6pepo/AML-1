@@ -9,6 +9,7 @@ from sklearn.model_selection import KFold
 from scipy.optimize import curve_fit
 from scipy.stats import ttest_ind
 from matplotlib import cm, colors
+from matplotlib.ticker import MaxNLocator
 from tqdm import tqdm
 
 def RF_binary_kfold(n_trees, k, patterns, labels, label0, label1, ext_patt = None, ext_lab = None):
@@ -23,7 +24,7 @@ def RF_binary_kfold(n_trees, k, patterns, labels, label0, label1, ext_patt = Non
     kf = KFold(n_splits = k, shuffle = True)
     indices = kf.split(labels)
 
-    if ext_lab != None:
+    if np.any(ext_lab != None):
         vote_1_ext = np.zeros(len(ext_lab))
         vote_0_ext = np.zeros(len(ext_lab))
 
@@ -89,7 +90,7 @@ def RF_binary_kfold(n_trees, k, patterns, labels, label0, label1, ext_patt = Non
         fold_specificity.append(temp_specificity)
 
         # External test: Majority vote counting
-        if ext_lab != None:
+        if np.any(ext_lab != None):
             ext_pred = model.predict(ext_patt)
 
             for j, pred in enumerate(ext_pred):
@@ -105,7 +106,7 @@ def RF_binary_kfold(n_trees, k, patterns, labels, label0, label1, ext_patt = Non
     bacc_sensitivity = 0.
     bacc_specificity = 0.
 
-    if ext_lab != None:
+    if np.any(ext_lab != None):
         bacc_predict = bacc_model.predict(ext_patt)
 
         for j, pred in enumerate(bacc_predict):
@@ -123,7 +124,7 @@ def RF_binary_kfold(n_trees, k, patterns, labels, label0, label1, ext_patt = Non
     bsens_sensitivity = 0.
     bsens_specificity = 0.
 
-    if ext_lab != None:
+    if np.any(ext_lab != None):
         bsens_predict = bsens_model.predict(ext_patt)
 
         for j, pred in enumerate(bsens_predict):
@@ -141,7 +142,7 @@ def RF_binary_kfold(n_trees, k, patterns, labels, label0, label1, ext_patt = Non
     bspec_sensitivity = 0.
     bspec_specificity = 0.
     
-    if ext_lab != None:
+    if np.any(ext_lab != None):
         bspec_predict = bspec_model.predict(ext_patt)
 
         for j, pred in enumerate(bspec_predict):
@@ -159,7 +160,7 @@ def RF_binary_kfold(n_trees, k, patterns, labels, label0, label1, ext_patt = Non
     ext_specificity = 0.
     conf_mat = np.zeros((2,2))
 
-    if ext_lab != None:
+    if np.any(ext_lab != None):
         for i, true_label in enumerate(ext_lab):
             if vote_0_ext[i]>=vote_1_ext[i]:
                 if true_label == label1:
@@ -213,7 +214,7 @@ def RF_binary_scanner(tree_range, k_range, n_seeds, patterns, labels, label0, la
 
     print("Begin Scanning...")
 
-    tot_iter = len_tree*len_k
+    tot_iter = len_tree*len_k*n_seeds
     progress = tqdm(total=tot_iter)
     iter = 0
 
@@ -235,7 +236,7 @@ def RF_binary_scanner(tree_range, k_range, n_seeds, patterns, labels, label0, la
                 sensitivity_list[i_trees, i_k, i] = res['Sens']
                 specificity_list[i_trees, i_k, i] = res['Spec']
 
-    print("Finished Scanning!                                                \n")
+    print("\nFinished Scanning!                                                \n")
 
     res = {
         'Acc List': np.mean(accuracy_list, axis=2),
@@ -344,12 +345,13 @@ def check_var(sig1,sig2):
         return False
 
 def plot_histo_gaus_stat(dist1, label1, dist2, label2):
-    root = tk.Tk()
-    screen_width = root.winfo_screenwidth()
-    screen_height = root.winfo_screenheight()
-    root.destroy() 
+    # root = tk.Tk()
+    # screen_width = root.winfo_screenwidth()
+    # screen_height = root.winfo_screenheight()
+    # root.destroy() 
 
-    fig, ax = plt.subplots(figsize=(screen_width / 100, screen_height / 100))
+    # fig, ax = plt.subplots(figsize=(screen_width / 100, screen_height / 100))
+    fig, ax = plt.subplots()
     bin_vals1, bins1, _ = ax.hist(dist1, bins='auto', alpha = 0.5, color='red', label = label1)
     bin_vals2, bins2, _ = ax.hist(dist2, bins='auto', alpha = 0.5, color='blue', label = label2)
 
@@ -374,9 +376,9 @@ def plot_histo_gaus_stat(dist1, label1, dist2, label2):
 
     ax.plot([],[], marker= None, linestyle='None', label=f't-stat: {stat_res.statistic:.2f}, p-value: {stat_res.pvalue:.2f}')
 
-    ax.legend(loc='best', fontsize='large')
+    ax.legend(loc='best')
 
-    return fig,ax,stat_res
+    return fig, ax, stat_res
 
 def torch_eig(mat):
     if torch.cuda.is_available():
@@ -397,3 +399,21 @@ def torch_eig(mat):
     torch.cuda.empty_cache()
 
     return e_val, e_vec
+
+def heatmap_plotter(ax, x, y, array, title, norm, cmap = cm.viridis):
+    colormesh = ax.pcolormesh(x, y, array, norm=norm, cmap=cmap)
+    ax.set_ylabel("Number of trees")
+    ax.set_xlabel("Number of folds")
+    ax.set_title(title)
+    ax.xaxis.set_major_locator(MaxNLocator(integer=True))
+    ax.yaxis.set_major_locator(MaxNLocator(integer=True))
+
+    rows,cols = array.shape
+    for row in range(rows):
+        for col in range(cols):
+            if norm(array[row][col]) < 0.5:
+                ax.text(x[col], y[row], f"{array[row,col]:.2f}", ha='center', va='center', color=cmap(0.99))
+            else:
+                ax.text(x[col], y[row], f"{array[row,col]:.2f}", ha='center', va='center', color=cmap(0.))
+
+    return colormesh

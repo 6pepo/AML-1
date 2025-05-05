@@ -18,7 +18,7 @@ def h_line(x,c):
 
 start = clock.time()
 
-n_iter = 1000
+n_iter = 100
 
 # Iperparameters non-PCA
 k = 6
@@ -121,7 +121,7 @@ for n in range(n_iter):
     conf_mat_list.append(res['Conf Mat'])
 
     # Counting root feature in decision Trees
-    for model in res['models']:
+    for model in res['Models']:
         for estim in model.estimators_:
             feat_counter[estim.tree_.feature[0]] += 1
 
@@ -271,7 +271,7 @@ for n in range(n_iter):
     spec_list.append(res['Spec'])
 
     PCA_acc_bacc_list.append(res['BAcc Acc'])
-    PCA_sens_bacc_list.append(res['Bcc Sens'])
+    PCA_sens_bacc_list.append(res['BAcc Sens'])
     PCA_spec_bacc_list.append(res['BAcc Spec'])
 
     PCA_acc_bsens_list.append(res['BSens Acc'])
@@ -288,14 +288,14 @@ for n in range(n_iter):
     conf_mat_list.append(res['Conf Mat'])
 
     # Counting root feature in decision Trees
-    for model in res['models']:
+    for model in res['Models']:
         for estim in model.estimators_:
             feat_counter[estim.tree_.feature[0]] += 1
 
     cpu_time_stamp = clock.process_time() - start_single_pca
     cpu_time_pca.append(cpu_time_stamp)
     print(f'\t\t\tCPU Time: {cpu_time_stamp}', end='\r')
-print('Done!                                  ')
+print('Done!                                                ')
 
 
 prim_feat_trees = np.argsort(feat_counter)[::-1]
@@ -517,12 +517,13 @@ dict = {'Base CV Avg': [tot_acc, tot_sens, tot_spec],
 results = pd.DataFrame(data = dict, index = ['Accuracy', 'Sensitivity', 'Specificity'])
 results.to_csv('results.csv')
 
-root = tk.Tk()
-screen_width = root.winfo_screenwidth()
-screen_height = root.winfo_screenheight()
-root.destroy() 
+# root = tk.Tk()
+# screen_width = root.winfo_screenwidth()
+# screen_height = root.winfo_screenheight()
+# root.destroy() 
 
-time_fig, time_ax = plt.subplots(figsize=(screen_width / 100, screen_height / 100))
+# time_fig, time_ax = plt.subplots(figsize=(screen_width / 100, screen_height / 100))
+time_fig, time_ax = plt.subplots()
 iterations = np.arange(0,n_iter,1)
 
 popt_not_pca, pcov_not_pca = curve_fit(h_line, iterations,cpu_time_non_pca, maxfev=10000)
