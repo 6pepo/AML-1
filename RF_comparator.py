@@ -3,17 +3,18 @@ import sklearn.ensemble as ens
 import matplotlib.pyplot as plt
 import time as clock
 import pandas as pd
-import tkinter as tk 
+import tkinter as tk
+import os
 
 from scipy.stats import ttest_ind
 from sklearn.model_selection import KFold
 from scipy.io import loadmat
 from scipy.optimize import curve_fit
 
-def gaussian(x,a,mean,sigma):
-    return a*np.exp(-((x-mean)**2/(sigma**2))/2)
-
 import RF_Library as RF     # Custom made functions
+
+def h_line(x,c):
+    return c
 
 start = clock.time()
 
@@ -90,7 +91,9 @@ base_spec_bspec_list = []
 
 print('Starting Non-PCA iterations...')
 start_non_pca = clock.process_time()                               #CPU time is different in 2.7-
+cpu_time_non_pca = []
 for n in range(n_iter):
+    start_single_non_pca= clock.process_time()  
     # print("Iteration: {}/{} \r".format(n+1, n_iter)),
     print(f'Iteration: {n+1}/{n_iter}', end='\r' )
 
@@ -121,6 +124,10 @@ for n in range(n_iter):
     for model in res['models']:
         for estim in model.estimators_:
             feat_counter[estim.tree_.feature[0]] += 1
+
+    cpu_time_stamp = clock.process_time() - start_single_non_pca
+    cpu_time_non_pca.append(cpu_time_stamp)
+    print(f'\t\t\tCPU Time: {cpu_time_stamp}', end='\r')
 print('Done!                                  ')
 
 
@@ -167,7 +174,8 @@ print("Performance of External test: Majority vote")
 print("Accuracy: {:.2%} +- {:.2%} Rel: {:.2%}".format(tot_acc_ext, tot_acc_ext_std, tot_acc_ext_std/tot_acc_ext))
 print("Sensitivity: {:.2%} +- {:.2%} Rel: {:.2%}".format(tot_sens_ext, tot_sens_ext_std, tot_sens_ext_std/tot_sens_ext))
 print("Specificity: {:.2%} +- {:.2%} Rel: {:.2%}".format(tot_spec_ext, tot_spec_ext_std, tot_spec_ext_std/tot_spec_ext))
-print("CPU Time:" + str((clock.process_time() - start_non_pca)) + ' s')
+print("Mean CPU Time for single iteration: {:.2}".format(np.mean(cpu_time_non_pca)))
+print("Tot CPU Time:" + str((clock.process_time() - start_non_pca)))
 print("\n")
 
 fig_baseCM, ax_baseCM = RF.confMat_binary_plot(tot_conf_mat, title="Confusion Matrix - non PCA")
@@ -250,7 +258,9 @@ PCA_spec_bspec_list = []
 
 print('Starting PCA iterations...')
 start_pca = clock.process_time()
+cpu_time_pca = []
 for n in range(n_iter):
+    start_single_pca= clock.process_time() 
     # print("Iteration: {}/{} \r".format(n+1, n_iter)),
     print(f'Iteration: {n+1}/{n_iter}', end='\r' )
 
@@ -281,6 +291,10 @@ for n in range(n_iter):
     for model in res['models']:
         for estim in model.estimators_:
             feat_counter[estim.tree_.feature[0]] += 1
+
+    cpu_time_stamp = clock.process_time() - start_single_pca
+    cpu_time_pca.append(cpu_time_stamp)
+    print(f'\t\t\tCPU Time: {cpu_time_stamp}', end='\r')
 print('Done!                                  ')
 
 
@@ -372,188 +386,157 @@ print("Specificity: {:.2%} +- {:.2%} Rel: {:.2%}".format(PCA_spec_bspec, PCA_spe
 print("\n")
 
 
-root = tk.Tk()
-screen_width = root.winfo_screenwidth()
-screen_height = root.winfo_screenheight()
-root.destroy()  # Close the tkinter window
+pca_label = 'PCA'
+not_pca_label = 'NON PCA'
 
-fig, ax = plt.subplots(figsize=(screen_width / 100, screen_height / 100))
-cv_sens_bin_vals, cv_sens_bins, _ = ax.hist(cross_sens_stat, bins='auto', alpha = 0.5, color='red', label ='NON PCA')
-PCA_sens_bin_vals, PCA_sens_bins, _ = ax.hist(PCA_sens_stat, bins='auto', alpha = 0.5, color='blue', label ='PCA')
+if not os.path.exists('distributions/cross_validation'):
+        os.makedirs('distributions/cross_validation')
+if not os.path.exists('distributions/cross_validation/majority'):
+        os.makedirs('distributions/cross_validation/majority')
 
-cv_sens_bin_centers = (cv_sens_bins[:-1] + cv_sens_bins[1:])/2
-i_max = np.argmax(cv_sens_bin_vals)
-par = [cv_sens_bin_vals[i_max], cv_sens_bin_centers[i_max], 0.05]
-popt_cv_sens, pcov_cv_sens = curve_fit(gaussian, cv_sens_bin_centers, cv_sens_bin_vals, par, maxfev=10000)
-
-PCA_sens_bin_centers = (PCA_sens_bins[:-1] + PCA_sens_bins[1:])/2
-i_max = np.argmax(PCA_sens_bin_vals)
-par = [PCA_sens_bin_vals[i_max], PCA_sens_bin_centers[i_max], 0.05]
-popt_PCA_cv_sens, pcov_PCA_cv_sens = curve_fit(gaussian, PCA_sens_bin_centers, PCA_sens_bin_vals, par, maxfev=10000)
-
-x = np.linspace(np.min(np.concatenate((cv_sens_bins, PCA_sens_bins))), np.max(np.concatenate((cv_sens_bins, PCA_sens_bins))), 1000)
-ax.plot(x, gaussian(x,*popt_cv_sens), 'r--', label=f'Gaussian Fit: $\mu$ = {popt_cv_sens[1]:.2f}, $\sigma$ = {popt_cv_sens[2]:.2f}, A = {popt_cv_sens[0]:.2f}')
-ax.plot(x, gaussian(x,*popt_PCA_cv_sens), 'b--', label=f'Gaussian Fit: $\mu$ = {popt_PCA_cv_sens[1]:.2f}, $\sigma$ = {popt_PCA_cv_sens[2]:.2f}, A = {popt_PCA_cv_sens[0]:.2f}')
-
-cross_sens_res = ttest_ind(gaussian(x,*popt_cv_sens), gaussian(x,*popt_PCA_cv_sens), equal_var=False, alternative='greater')
-ax.plot([],[], marker= None, linestyle='None', label=f'p-value fit: {cross_sens_res.pvalue:.2f}')
-
-plt.legend()
-plt.title('Sensitivity Distributions Cross Validation')
-plt.savefig('sensitivity_dist_cross_validation.png')
-
-fig1, ax1 = plt.subplots(figsize=(screen_width / 100, screen_height / 100))
-cv_spec_bin_vals, cv_spec_bins, _ = ax1.hist(cross_spec_stat, bins='auto', alpha = 0.5, color='red', label ='NON PCA')
-PCA_spec_bin_vals, PCA_spec_bins, _ = ax1.hist(PCA_spec_stat, bins='auto', alpha = 0.5, color='blue', label ='PCA')
-
-cv_spec_bin_centers = (cv_spec_bins[:-1] + cv_spec_bins[1:])/2
-i_max = np.argmax(cv_spec_bin_vals)
-par = [cv_spec_bin_vals[i_max], cv_spec_bin_centers[i_max], 0.05]
-popt_cv_spec, pcov_cv_spec = curve_fit(gaussian, cv_spec_bin_centers, cv_spec_bin_vals, par, maxfev=10000)
-
-PCA_spec_bin_centers = (PCA_spec_bins[:-1] + PCA_spec_bins[1:])/2
-i_max = np.argmax(PCA_spec_bin_vals)
-par = [PCA_spec_bin_vals[i_max], PCA_spec_bin_centers[i_max], 0.05]
-popt_PCA_cv_spec, pcov_PCA_cv_spec = curve_fit(gaussian, PCA_spec_bin_centers, PCA_spec_bin_vals, par, maxfev=10000)
-
-x = np.linspace(np.min(np.concatenate((cv_spec_bins, PCA_spec_bins))), np.max(np.concatenate((cv_spec_bins, PCA_spec_bins))), 1000)
-ax1.plot(x, gaussian(x,*popt_cv_spec), 'r--', label=f'Gaussian Fit: $\mu$ = {popt_cv_spec[1]:.2f}, $\sigma$ = {popt_cv_spec[2]:.2f}, A = {popt_cv_spec[0]:.2f}')
-ax1.plot(x, gaussian(x,*popt_PCA_cv_spec), 'b--', label=f'Gaussian Fit: $\mu$ = {popt_PCA_cv_spec[1]:.2f}, $\sigma$ = {popt_PCA_cv_spec[2]:.2f}, A = {popt_PCA_cv_spec[0]:.2f}')
-
-cross_spec_res = ttest_ind(gaussian(x,*popt_cv_spec), gaussian(x,*popt_PCA_cv_spec), equal_var=False, alternative='greater')
-ax1.plot([],[], marker= None, linestyle='None', label=f'p-value fit: {cross_spec_res.pvalue:.2f}')
-
-plt.legend()
-plt.title('Specificity Distributions Cross Validation')
-plt.savefig('specificity_dist_cross_validation.png')
+if not os.path.exists('distributions/external_test'):
+        os.makedirs('distributions/external_test')
+if not os.path.exists('distributions/external_test/majority'):
+        os.makedirs('distributions/external_test/majority')
+if not os.path.exists('distributions/external_test/best_model'):
+        os.makedirs('distributions/external_test/best_model')  
+if not os.path.exists('distributions/external_test/best_model/best_accuracy'):
+        os.makedirs('distributions/external_test/best_model/best_accuracy')  
+if not os.path.exists('distributions/external_test/best_model/best_sensitivity'):
+        os.makedirs('distributions/external_test/best_model/best_sensitivity')  
+if not os.path.exists('distributions/external_test/best_model/best_specificity'):
+        os.makedirs('distributions/external_test/best_model/best_specificity')  
 
 print('Cross Validation Statistics:')
-cross_acc_res = ttest_ind(cross_acc_stat, PCA_acc_stat, equal_var=False)
-print('Accuracy t-stat: {:.2}, p-value: {:.2}'.format(cross_acc_res.statistic, cross_acc_res.pvalue))
-cross_sens_res = ttest_ind(cross_sens_stat, PCA_sens_stat, equal_var=False)
-print('Sensitivity t-stat: {:.2}, p-value histo: {:.2}'.format(cross_sens_res.statistic, cross_sens_res.pvalue))
-cross_spec_res = ttest_ind(cross_spec_stat, PCA_spec_stat, equal_var=False)
-print('Specificity t-stat: {:.2}, p-value histo: {:.2}\n'.format(cross_spec_res.statistic, cross_spec_res.pvalue))
-
-fig2, ax2 = plt.subplots(figsize=(screen_width / 100, screen_height / 100))
-cv_sens_ext_bin_vals, cv_sens_ext_bins, _ = ax2.hist(cross_sens_ext_stat, bins='auto', alpha = 0.5, color='red', label ='NOT PCA')
-PCA_sens_ext_bin_vals, PCA_sens_ext_bins, _ = ax2.hist(PCA_sens_ext_stat, bins='auto', alpha = 0.5, color='blue', label ='PCA')
-
-mask_sens_ext = np.where(cv_sens_ext_bin_vals != 0)
-cv_sens_ext_bin_centers = (cv_sens_ext_bins[:-1] + cv_sens_ext_bins[1:])/2
-i_max = np.argmax(cv_sens_ext_bin_vals)
-par = [cv_sens_ext_bin_vals[i_max], cv_sens_ext_bin_centers[i_max], 0.05]
-popt_cv_sens_ext, pcov_cv_sens_ext = curve_fit(gaussian, cv_sens_ext_bin_centers[mask_sens_ext], cv_sens_ext_bin_vals[mask_sens_ext], par, maxfev=10000)
-
-PCA_mask_sens_ext = np.where(PCA_sens_ext_bin_vals != 0)
-PCA_sens_ext_bin_centers = (PCA_sens_ext_bins[:-1] + PCA_sens_ext_bins[1:])/2
-i_max = np.argmax(PCA_sens_ext_bin_vals)
-par = [PCA_sens_ext_bin_vals[i_max], PCA_sens_ext_bin_centers[i_max], 0.05]
-popt_PCA_cv_sens_ext, pcov_PCA_cv_sens_ext = curve_fit(gaussian, PCA_sens_ext_bin_centers[PCA_mask_sens_ext], PCA_sens_ext_bin_vals[PCA_mask_sens_ext], par, maxfev=10000)
-
-x = np.linspace(np.min(np.concatenate((cv_sens_ext_bins, PCA_sens_ext_bins))), np.max(np.concatenate((cv_sens_ext_bins, PCA_sens_ext_bins))), 1000)
-ax2.plot(x, gaussian(x,*popt_cv_sens_ext), 'r--', label=f'Gaussian Fit: $\mu$ = {popt_cv_sens_ext[1]:.2f}, $\sigma$ = {popt_cv_sens_ext[2]:.2f}, A = {popt_cv_sens_ext[0]:.2f}')
-ax2.plot(x, gaussian(x,*popt_PCA_cv_sens_ext), 'b--', label=f'Gaussian Fit: $\mu$ = {popt_PCA_cv_sens_ext[1]:.2f}, $\sigma$ = {popt_PCA_cv_sens_ext[2]:.2f}, A = {popt_PCA_cv_sens_ext[0]:.2f}')
-
-ext_sens_res = ttest_ind(gaussian(x,*popt_cv_sens_ext), gaussian(x,*popt_PCA_cv_sens_ext), equal_var=False, alternative='greater')
-ax2.plot([],[], marker= None, linestyle='None', label=f'p-value fit: {ext_sens_res.pvalue:.2f}')
-
-plt.legend()
-plt.title('Sensitivity Distributions External Test')
-plt.savefig('sensitivity_dist_external_test.png')
-
-fig3, ax3 = plt.subplots(figsize=(screen_width / 100, screen_height / 100))
-cv_spec_ext_bin_vals, cv_spec_ext_bins, _ = ax3.hist(cross_spec_ext_stat, bins='auto', alpha = 0.5, color='red', label ='NOT PCA')
-PCA_spec_ext_bin_vals, PCA_spec_ext_bins, _ = ax3.hist(PCA_spec_ext_stat, bins='auto', alpha = 0.5, color='blue', label ='PCA')
-
-mask_spec_ext = np.where(cv_spec_ext_bin_vals != 0)
-cv_spec_ext_bin_centers = (cv_spec_ext_bins[:-1] + cv_spec_ext_bins[1:])/2
-i_max = np.argmax(cv_spec_ext_bin_vals)
-par = [cv_spec_ext_bin_vals[i_max], cv_spec_ext_bin_centers[i_max], 0.05]
-popt_cv_spec_ext, pcov_cv_spec_ext = curve_fit(gaussian, cv_spec_ext_bin_centers[mask_spec_ext], cv_spec_ext_bin_vals[mask_spec_ext], par, maxfev=10000)
-
-PCA_mask_spec_ext = np.where(PCA_spec_ext_bin_vals != 0)
-PCA_spec_ext_bin_centers = (PCA_spec_ext_bins[:-1] + PCA_spec_ext_bins[1:])/2
-i_max = np.argmax(PCA_spec_ext_bin_vals)
-par = [PCA_spec_ext_bin_vals[i_max], PCA_spec_ext_bin_centers[i_max], 0.05]
-popt_PCA_cv_spec_ext, pcov_PCA_cv_spec_ext = curve_fit(gaussian, PCA_spec_ext_bin_centers[PCA_mask_spec_ext], PCA_spec_ext_bin_vals[PCA_mask_spec_ext], par, maxfev=10000)
-
-x = np.linspace(np.min(np.concatenate((cv_spec_ext_bins, PCA_spec_ext_bins))), np.max(np.concatenate((cv_spec_ext_bins, PCA_spec_ext_bins))), 1000)
-ax3.plot(x, gaussian(x,*popt_cv_spec_ext), 'r--', label=f'Gaussian Fit: $\mu$ = {popt_cv_spec_ext[1]:.2f}, $\sigma$ = {popt_cv_spec_ext[2]:.2f}, A = {popt_cv_spec_ext[0]:.2f}')
-ax3.plot(x, gaussian(x,*popt_PCA_cv_spec_ext), 'b--', label=f'Gaussian Fit: $\mu$ = {popt_PCA_cv_spec_ext[1]:.2f}, $\sigma$ = {popt_PCA_cv_spec_ext[2]:.2f}, A = {popt_PCA_cv_spec_ext[0]:.2f}')
-
-ext_spec_res = ttest_ind(gaussian(x,*popt_cv_spec_ext), gaussian(x,*popt_PCA_cv_spec_ext), equal_var=False, alternative='greater')
-ax3.plot([],[], marker= None, linestyle='None', label=f'p-value fit: {ext_spec_res.pvalue:.2f}')
-
-plt.legend()
-plt.title('Specificity Distributions External Test')
-plt.savefig('specificity_dist_external_test.png')
+cv_maj_acc_fig, cv_maj_acc_ax, base_acc_res = RF.plot_histo_gaus_stat(base_acc_stat, not_pca_label, PCA_acc_stat, pca_label)
+cv_maj_acc_ax.set_title('Accuracy Distributions Cross Validation Majority Vote')
+cv_maj_acc_fig.savefig('distributions/cross_validation/majority/accuracy_dist_maj_cv.png')
+print('Accuracy t-stat: {:.2}, p-value: {:.2}'.format(base_acc_res.statistic, base_acc_res.pvalue))
+cv_maj_sens_fig, cv_maj_sens_ax, base_sens_res = RF.plot_histo_gaus_stat(base_sens_stat, not_pca_label, PCA_sens_stat, pca_label)
+cv_maj_sens_ax.set_title('Sensitivity Distribution Cross Validation Majority Vote')
+cv_maj_sens_fig.savefig('distributions/cross_validation/majority/sensitivity_dist_maj_cv.png')
+print('Sensitivity t-stat: {:.2}, p-value: {:.2}'.format(base_sens_res.statistic, base_sens_res.pvalue))
+cv_maj_spec_fig, cv_maj_spec_ax, base_spec_res = RF.plot_histo_gaus_stat(base_spec_stat, not_pca_label, PCA_spec_stat, pca_label)
+cv_maj_spec_ax.set_title('Specificity Distribution Cross Validation Majority Vote')
+cv_maj_spec_fig.savefig('distributions/cross_validation/majority/specificity_dist_maj_cv.png')
+print('Specificity t-stat: {:.2}, p-value: {:.2}\n'.format(base_spec_res.statistic, base_spec_res.pvalue))
 
 print('External Test (Majority vote) Statistics:')
-ext_acc_res = ttest_ind(cross_acc_ext_stat, PCA_acc_ext_stat, equal_var=False)
+ext_maj_acc_fig, ext_maj_acc_ax, ext_acc_res = RF.plot_histo_gaus_stat(base_acc_ext_stat, not_pca_label, PCA_acc_ext_stat, pca_label)
+ext_maj_acc_ax.set_title('Accuracy Distribution External Test Majority Vote')
+ext_maj_acc_fig.savefig('distributions/external_test/majority/accuracy_dist_maj_ext.png')
 print('Accuracy t-stat: {:.2}, p-value: {:.2}'.format(ext_acc_res.statistic, ext_acc_res.pvalue))
-ext_sens_res = ttest_ind(cross_sens_ext_stat, PCA_sens_ext_stat, equal_var=False)
-print('Sensitivity t-stat: {:.2}, p-value histo: {:.2}'.format(ext_sens_res.statistic, ext_sens_res.pvalue))
-ext_spec_res = ttest_ind(cross_spec_ext_stat, PCA_spec_ext_stat, equal_var=False)
-print('Specificity t-stat: {:.2}, p-value histo: {:.2}\n'.format(ext_spec_res.statistic, ext_spec_res.pvalue))
+ext_maj_sens_fig, ext_maj_sens_ax, ext_sens_res = RF.plot_histo_gaus_stat(base_sens_ext_stat, not_pca_label, PCA_sens_ext_stat, pca_label)
+ext_maj_sens_ax.set_title('Sensitivity Distribution External Test Majority Vote')
+ext_maj_sens_fig.savefig('distributions/external_test/majority/sensitivity_dist_maj_ext.png')
+print('Sensitivity t-stat: {:.2}, p-value: {:.2}'.format(ext_sens_res.statistic, ext_sens_res.pvalue))
+ext_maj_spec_fig, ext_maj_spec_ax, ext_spec_res = RF.plot_histo_gaus_stat(base_spec_ext_stat, not_pca_label, PCA_spec_ext_stat, pca_label)
+ext_maj_spec_ax.set_title('Specificity Distribution External Test Majority Vote')
+ext_maj_spec_fig.savefig('distributions/external_test/majority/specificity_dist_maj_ext.png')
+print('Specificity t-stat: {:.2}, p-value: {:.2}\n'.format(ext_spec_res.statistic, ext_spec_res.pvalue))
 
 print('External Test (Best Accuracy in Training) Statistics:')
-bacc_acc_res = ttest_ind(base_acc_bacc_list, PCA_acc_bacc_list, equal_var=False)
+ext_bacc_acc_fig, ext_bacc_acc_ax, bacc_acc_res = RF.plot_histo_gaus_stat(base_acc_bacc_list, not_pca_label, PCA_acc_bacc_list, pca_label)
+ext_bacc_acc_ax.set_title('Accuracy Distribution External Test Best Accuracy in Training')
+ext_bacc_acc_fig.savefig('distributions/external_test/best_model/best_accuracy/accuracy_dist_bacc_ext.png')
 print('Accuracy t-stat: {:.2}, p-value: {:.2}'.format(bacc_acc_res.statistic, bacc_acc_res.pvalue))
-bacc_sens_res = ttest_ind(base_sens_bacc_list, PCA_sens_bacc_list, equal_var=False)
+ext_bacc_sens_fig, ext_bacc_sens_ax, bacc_sens_res = RF.plot_histo_gaus_stat(base_sens_bacc_list, not_pca_label, PCA_sens_bacc_list, pca_label)
+ext_bacc_sens_ax.set_title('Sensitivity Distribution External Test Best Accuracy in Training')
+ext_bacc_sens_fig.savefig('distributions/external_test/best_model/best_accuracy/sensitivity_dist_bacc_ext.png')
 print('Sensitivity t-stat: {:.2}, p-value: {:.2}'.format(bacc_sens_res.statistic, bacc_sens_res.pvalue))
-bacc_spec_res = ttest_ind(base_spec_bacc_list, PCA_spec_bacc_list, equal_var=False)
+ext_bacc_spec_fig, ext_bacc_spec_ax, bacc_spec_res = RF.plot_histo_gaus_stat(base_spec_bacc_list, not_pca_label, PCA_spec_bacc_list, pca_label)
+ext_bacc_spec_ax.set_title('Specificity Distribution External Test Best Accuracy in Training')
+ext_bacc_spec_fig.savefig('distributions/external_test/best_model/best_accuracy/specificity_dist_bacc_ext.png')
 print('Specificity t-stat: {:.2}, p-value: {:.2}\n'.format(bacc_spec_res.statistic, bacc_spec_res.pvalue))
 
 print('External Test (Best Sensitivity in Training) Statistics:')
-bsens_acc_res = ttest_ind(base_acc_bsens_list, PCA_acc_bsens_list, equal_var=False)
+ext_bsens_acc_fig, ext_bsens_acc_ax, bsens_acc_res = RF.plot_histo_gaus_stat(base_acc_bsens_list, not_pca_label, PCA_acc_bsens_list, pca_label)
+ext_bsens_acc_ax.set_title('Accuracy Distribution External Test Best Sensitivity in Training')
+ext_bsens_acc_fig.savefig('distributions/external_test/best_model/best_sensitivity/accuracy_dist_bsens_ext.png')
 print('Accuracy t-stat: {:.2}, p-value: {:.2}'.format(bsens_acc_res.statistic, bsens_acc_res.pvalue))
-bsens_sens_res = ttest_ind(base_sens_bsens_list, PCA_sens_bsens_list, equal_var=False)
+ext_bsens_sens_fig, ext_bsens_sens_ax, bsens_sens_res = RF.plot_histo_gaus_stat(base_sens_bsens_list, not_pca_label, PCA_sens_bsens_list, pca_label)
+ext_bsens_sens_ax.set_title('Sensitivity Distribution External Test Best Sensitivity in Training')
+ext_bsens_sens_fig.savefig('distributions/external_test/best_model/best_sensitivity/sensitivity_dist_bsens_ext.png')
 print('Sensitivity t-stat: {:.2}, p-value: {:.2}'.format(bsens_sens_res.statistic, bsens_sens_res.pvalue))
-bsens_spec_res = ttest_ind(base_spec_bsens_list, PCA_spec_bsens_list, equal_var=False)
+ext_bsens_spec_fig, ext_bsens_spec_ax, bsens_spec_res = RF.plot_histo_gaus_stat(base_spec_bsens_list, not_pca_label, PCA_spec_bsens_list, pca_label)
+ext_bsens_spec_ax.set_title('Specificity Distribution External Test Best Sensitivity in Training')
+ext_bsens_spec_fig.savefig('distributions/external_test/best_model/best_sensitivity/specificity_dist_bsens_ext.png')
 print('Specificity t-stat: {:.2}, p-value: {:.2}\n'.format(bsens_spec_res.statistic, bsens_spec_res.pvalue))
 
 print('External Test (Best Specificity in Training) Statistics:')
-bspec_acc_res = ttest_ind(base_acc_bspec_list, PCA_acc_bspec_list, equal_var=False)
+ext_bspec_acc_fig, ext_bspec_acc_ax, bspec_acc_res = RF.plot_histo_gaus_stat(base_acc_bspec_list, not_pca_label, PCA_acc_bspec_list, pca_label)
+ext_bspec_acc_ax.set_title('Accuracy Distribution External Test Best Specificity in Training')
+ext_bspec_acc_fig.savefig('distributions/external_test/best_model/best_specificity/accuracy_dist_bspec_ext.png')
 print('Accuracy t-stat: {:.2}, p-value: {:.2}'.format(bspec_acc_res.statistic, bspec_acc_res.pvalue))
-bspec_sens_res = ttest_ind(base_sens_bspec_list, PCA_sens_bspec_list, equal_var=False)
+ext_bspec_sens_fig, ext_bspec_sens_ax, bspec_sens_res = RF.plot_histo_gaus_stat(base_sens_bspec_list, not_pca_label, PCA_sens_bspec_list, pca_label)
+ext_bspec_sens_ax.set_title('Sensitivity Distribution External Test Best Specificity in Training')
+ext_bspec_sens_fig.savefig('distributions/external_test/best_model/best_specificity/sensitivity_dist_bspec_ext.png')
 print('Sensitivity t-stat: {:.2}, p-value: {:.2}'.format(bspec_sens_res.statistic, bspec_sens_res.pvalue))
-bspec_spec_res = ttest_ind(base_spec_bspec_list, PCA_spec_bspec_list, equal_var=False)
+ext_bspec_spec_fig, ext_bspec_spec_ax, bspec_spec_res = RF.plot_histo_gaus_stat(base_spec_bspec_list, not_pca_label, PCA_spec_bspec_list, pca_label)
+ext_bspec_spec_ax.set_title('Specificity Distribution External Test Best Specificity in Training')
+ext_bspec_spec_fig.savefig('distributions/external_test/best_model/best_specificity/specificity_dist_bspec_ext.png')
 print('Specificity t-stat: {:.2}, p-value: {:.2}\n'.format(bspec_spec_res.statistic, bspec_spec_res.pvalue))
+
+print("Tempo:" + str(round((clock.time() - start)/60)) + "'" + str(round((clock.time() - start)%60)) + "''")
 
 dict = {'Base CV Avg': [tot_acc, tot_sens, tot_spec],
         'Base CV Std': [tot_acc_std, tot_sens_std, tot_spec_std],
-        'Base Ext Avg': [tot_acc_ext, tot_sens_ext, tot_spec_ext],
-        'Base Ext Std': [tot_acc_ext_std, tot_sens_ext_std, tot_spec_ext_std],
-        'Base BAcc Avg': [tot_acc_bacc, tot_sens_bacc, tot_spec_bacc],
-        'Base BAcc Std': [tot_acc_bacc_std, tot_sens_bacc_std, tot_spec_bacc_std],
-        'Base BSens Avg': [tot_acc_bsens, tot_sens_bsens, tot_spec_bsens],
-        'Base BSens Std': [tot_acc_bsens_std, tot_sens_bsens_std, tot_spec_bsens_std],
-        'Base BSpec Avg': [tot_acc_bspec, tot_sens_bspec, tot_spec_bspec],
-        'Base BSpec Std': [tot_acc_bspec_std, tot_sens_bspec_std, tot_spec_bspec_std],
         'PCA CV Avg': [PCA_acc, PCA_sens, PCA_spec],
         'PCA CV Std': [PCA_acc_std, PCA_sens_std, PCA_spec_std],
-        'PCA Ext Avg': [PCA_acc_ext, PCA_sens_ext, PCA_spec_ext],
-        'PCA BAcc Avg': [PCA_acc_bacc, PCA_sens_bacc, PCA_spec_bacc],
-        'PCA BAcc Std': [PCA_acc_bacc_std, PCA_sens_bacc_std, PCA_spec_bacc_std],
-        'PCA BSens Avg': [PCA_acc_bsens, PCA_sens_bsens, PCA_spec_bsens],
-        'PCA BSens Std': [PCA_acc_bsens_std, PCA_sens_bsens_std, PCA_spec_bsens_std],
-        'PCA BSpec Avg': [PCA_acc_bspec, PCA_sens_bspec, PCA_spec_bspec],
-        'PCA BSpec Std': [PCA_acc_bspec_std, PCA_sens_bspec_std, PCA_spec_bspec_std],
-        'PCA Ext Std': [PCA_acc_ext_std, PCA_sens_ext_std, PCA_spec_ext_std],
         'CV t-test': [base_acc_res.statistic, base_sens_res.statistic, base_spec_res.statistic],
         'CV p-value': [base_acc_res.pvalue, base_sens_res.pvalue, base_spec_res.pvalue],
+
+        'Base Ext Avg': [tot_acc_ext, tot_sens_ext, tot_spec_ext],
+        'Base Ext Std': [tot_acc_ext_std, tot_sens_ext_std, tot_spec_ext_std],
+        'PCA Ext Avg': [PCA_acc_ext, PCA_sens_ext, PCA_spec_ext],
+        'PCA Ext Std': [PCA_acc_ext_std, PCA_sens_ext_std, PCA_spec_ext_std],
         'Ext t-test': [ext_acc_res.statistic, ext_sens_res.statistic, ext_spec_res.statistic],
         'Ext p-value': [ext_acc_res.pvalue, ext_sens_res.pvalue, ext_spec_res.pvalue],
+
+        'Base BAcc Avg': [tot_acc_bacc, tot_sens_bacc, tot_spec_bacc],
+        'Base BAcc Std': [tot_acc_bacc_std, tot_sens_bacc_std, tot_spec_bacc_std],
+        'PCA BAcc Avg': [PCA_acc_bacc, PCA_sens_bacc, PCA_spec_bacc],
+        'PCA BAcc Std': [PCA_acc_bacc_std, PCA_sens_bacc_std, PCA_spec_bacc_std],
         'BAcc t-test': [bacc_acc_res.statistic, bacc_sens_res.statistic, bacc_spec_res.statistic],
         'BAcc p-value': [bacc_acc_res.pvalue, bacc_sens_res.pvalue, bacc_spec_res.pvalue],
+
+        'Base BSens Avg': [tot_acc_bsens, tot_sens_bsens, tot_spec_bsens],
+        'Base BSens Std': [tot_acc_bsens_std, tot_sens_bsens_std, tot_spec_bsens_std],
+        'PCA BSens Avg': [PCA_acc_bsens, PCA_sens_bsens, PCA_spec_bsens],
+        'PCA BSens Std': [PCA_acc_bsens_std, PCA_sens_bsens_std, PCA_spec_bsens_std],
         'BSens t-test': [bsens_acc_res.statistic, bsens_sens_res.statistic, bsens_spec_res.statistic],
         'BSens p-value': [bsens_acc_res.pvalue, bsens_sens_res.pvalue, bsens_spec_res.pvalue],
+
+        'Base BSpec Avg': [tot_acc_bspec, tot_sens_bspec, tot_spec_bspec],
+        'Base BSpec Std': [tot_acc_bspec_std, tot_sens_bspec_std, tot_spec_bspec_std],
+        'PCA BSpec Avg': [PCA_acc_bspec, PCA_sens_bspec, PCA_spec_bspec],
+        'PCA BSpec Std': [PCA_acc_bspec_std, PCA_sens_bspec_std, PCA_spec_bspec_std],
         'BSpec t-test': [bspec_acc_res.statistic, bspec_sens_res.statistic, bspec_spec_res.statistic],
         'BSpec p-value': [bspec_acc_res.pvalue, bspec_sens_res.pvalue, bspec_spec_res.pvalue]}
 
 results = pd.DataFrame(data = dict, index = ['Accuracy', 'Sensitivity', 'Specificity'])
 results.to_csv('results.csv')
 
-print("Tempo:" + str(round((clock.time() - start)/60)) + "'" + str(round((clock.time() - start)%60)) + "''")
+root = tk.Tk()
+screen_width = root.winfo_screenwidth()
+screen_height = root.winfo_screenheight()
+root.destroy() 
+
+time_fig, time_ax = plt.subplots(figsize=(screen_width / 100, screen_height / 100))
+iterations = np.arange(0,n_iter,1)
+
+popt_not_pca, pcov_not_pca = curve_fit(h_line, iterations,cpu_time_non_pca, maxfev=10000)
+popt_pca, pcov_pca = curve_fit(h_line, iterations,cpu_time_pca, maxfev=10000)
+
+time_ax.plot(iterations, cpu_time_non_pca, 'rx', label=f'NOT PCA:{popt_not_pca[0]:.2f} s')
+time_ax.hlines(popt_not_pca[0], 0, n_iter, colors='red', linestyles='dashed')
+time_ax.plot(iterations, cpu_time_pca, 'bo', label=f'PCA:{popt_pca[0]:.2f} s')
+time_ax.hlines(popt_pca[0], 0, n_iter, colors='blue', linestyles='dashed')
+time_ax.set_xlabel('Iteration')
+time_ax.set_ylabel('CPU Time (s)')
+time_ax.grid(True)
+time_ax.legend(loc='best', fontsize='large')
+time_ax.set_title('CPU Time')
+time_fig.savefig('CPU_time_iterations.png')
+
 plt.show()

@@ -3,6 +3,7 @@ import sklearn.ensemble as ens
 import matplotlib.pyplot as plt
 import matplotlib.table as tab
 import tkinter as tk
+import torch
 
 from sklearn.model_selection import KFold
 from scipy.optimize import curve_fit
@@ -374,3 +375,23 @@ def plot_histo_gaus_stat(dist1, label1, dist2, label2):
     ax.legend(loc='best', fontsize='large')
 
     return fig,ax,stat_res
+
+def torch_eig(mat):
+    if torch.cuda.is_available():
+        device = torch.device('cuda')
+    elif torch.backends.mps.is_available():
+        device = torch.device('mps')
+    else:
+        device = torch.device('cpu')
+    print('Torch Device: ', device.type)
+
+    torch_mat = torch.from_numpy(mat).to(device, dtype=torch.float32)
+
+    e_val, e_vec = torch.linalg.eigh(torch_mat)
+
+    e_val = e_val.cpu().numpy()
+    e_vec = e_vec.cpu().numpy()
+
+    torch.cuda.empty_cache()
+
+    return e_val, e_vec

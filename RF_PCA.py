@@ -2,9 +2,10 @@ import numpy as np
 import time as clock
 import pandas as pd
 
+import RF_Library as RF
+
 from sklearn.model_selection import KFold
 from scipy.io import loadmat
-from scipy.linalg import eig
 
 start = clock.time()
 
@@ -20,8 +21,7 @@ tot_pattern = np.concatenate((g0, g1), axis=0)
 corr = np.corrcoef(tot_pattern, rowvar=False)
 
 print('Calculating eigenvalues and eigenvectors...')
-e_val, e_vec = eig(corr) #in teoria più efficiente con scipy
-# e_vec = np.transpose(e_vec)
+e_val, e_vec = RF.torch_eig(corr) 
 
 print('Sorting eigenvalues and eigenvectors...\n')
 sort_index = np.argsort(e_val)[::-1]        # First 27 eigenvalues and eigenvectors are confirmed to be fully real
